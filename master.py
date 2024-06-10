@@ -1,7 +1,11 @@
 import paramiko
 from scp import SCPClient
-import os
+from datetime import datetime
 
+
+current_date = datetime.now().strftime("%Y-%m-%d")
+identity = "testowe-cyfrowe"
+system_version = "7.15"
 
 # MikroTik Router Details
 router_ip = '192.168.137.228'
@@ -9,8 +13,8 @@ router_user = 'python'
 router_password = 'zaq1@WSX'
 
 # Paths for local files
-local_export_file = r'C:\Users\User\Desktop\configexport.rsc'
-local_backup_file = r'C:\Users\User\Desktop\configBackup.backup'
+local_export_file = fr'C:\Users\User\Desktop\configexport-{identity}-{system_version}-{current_date}.rsc'
+local_backup_file = fr'C:\Users\User\Desktop\configBackup-{identity}-{system_version}-{current_date}.backup'
 
 def create_ssh_client(server, user, password):
     ssh = paramiko.SSHClient()
@@ -53,7 +57,7 @@ def run_mikrotik_script(ssh):
 def fetch_files_from_router(ssh, local_export, local_backup):
     with SCPClient(ssh.get_transport()) as scp:
         # List .rsc files on the router with detailed information
-        stdin, stdout, stderr = ssh.exec_command('ls -l /configExport-test-7.15-2024-06-10*.rsc')
+        stdin, stdout, stderr = ssh.exec_command(f'ls -l /configExport-test-7.15-{current_date}*.rsc')
         remote_rsc_files_info = stdout.read().decode().splitlines()
 
         # Fetch each matching .rsc file individually
