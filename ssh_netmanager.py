@@ -22,7 +22,7 @@ def ftp_retrieve_file(ftp_host, ftp_user, ftp_password, remote_filepath, local_f
 
 
 # SSH details
-router_ip = '192.168.137.138'
+router_ip = '192.168.137.228'
 ssh_port = 22
 username = "python"
 password = "zaq1@WSX"
