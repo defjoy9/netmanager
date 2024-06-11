@@ -2,19 +2,19 @@ import paramiko
 from scp import SCPClient
 from datetime import datetime
 
-
+current_time = datetime.now().strftime("%H-%M-%S")
 current_date = datetime.now().strftime("%Y-%m-%d")
 identity = "testowe-cyfrowe"
 system_version = "7.15"
 
 # MikroTik Router Details
-router_ip = '192.168.137.228'
+router_ip = '192.168.137.61'
 router_user = 'python'
 router_password = 'zaq1@WSX'
 
 # Paths for local files
-local_export_file = fr'C:\Users\User\Desktop\configexport-{identity}-{system_version}-{current_date}.rsc'
-local_backup_file = fr'C:\Users\User\Desktop\configBackup-{identity}-{system_version}-{current_date}.backup'
+local_export_file = fr'C:\Users\User\Desktop\configexport-{identity}-{system_version}-{current_date}-{current_time}.rsc'
+local_backup_file = fr'C:\Users\User\Desktop\configBackup-{identity}-{system_version}-{current_date}-{current_time}.backup'
 
 def create_ssh_client(server, user, password):
     ssh = paramiko.SSHClient()
@@ -25,23 +25,20 @@ def create_ssh_client(server, user, password):
 
 def run_mikrotik_script(ssh):
     # Commands to run
+    
+    get_system_version = ':put [system/package/update/get installed-version];'
+    get_identity = ':put [system/identity/get name]'
+    stdin, stdout, stderr = ssh.exec_command(get_system_version)
+    system_version = stdout.read().decode().strip()
+    stdin, stdout, stderr = ssh.exec_command(get_identity)
+    identity = stdout.read().decode().strip()   
+    
+    print(f"Identity - {identity}; System version {system_version}")
+
     command = """
     :local identity [/system identity get name];:local date [system/clock/get date];:local time [system/clock/get time];:local version [system/package/update/get installed-version];:local fileNameExport;:local fileNameBackup;:set fileNameExport ("configExport-".$identity."-".$version."-".$date."-".$time);:set fileNameBackup ("configBackup-".$identity."-".$version."-".$date."-".$time);/export file=$fileNameExport;/system backup save name=$fileNameBackup;
     """
-    # command = """
-    # :local identity [/system identity get name];
-    # :local date [/system clock get date];
-    # :local time [/system clock get time];
-    # :local version [/system package update get installed-version];
-    # :local fileNameExport ("configExport-" . $identity . "-" . $version . "-" . $date . "-" . $time);
-    # :local fileNameBackup ("configBackup-" . $identity . "-" . $version . "-" . $date . "-" . $time);
-    # /export file=$fileNameExport;
-    # /system backup save name=$fileNameBackup;
-    # :put ("Export file: " . $fileNameExport);
-    # :put ("Backup file: " . $fileNameBackup);
-    # """
-
-
+    
     print(f"Running command: {command}")
     stdin, stdout, stderr = ssh.exec_command(command)
     output = stdout.read().decode()
@@ -57,7 +54,7 @@ def run_mikrotik_script(ssh):
 def fetch_files_from_router(ssh, local_export, local_backup):
     with SCPClient(ssh.get_transport()) as scp:
         # List .rsc files on the router with detailed information
-        stdin, stdout, stderr = ssh.exec_command(f'ls -l /configExport-test-7.15-{current_date}*.rsc')
+        stdin, stdout, stderr = ssh.exec_command(f'ls -l /configExport-{identity}-{system_version}-{current_date}*.rsc')
         remote_rsc_files_info = stdout.read().decode().splitlines()
 
         # Fetch each matching .rsc file individually
@@ -71,7 +68,7 @@ def fetch_files_from_router(ssh, local_export, local_backup):
                 scp.get(remote_file_name, local_export)
 
         # List .backup files on the router with detailed information
-        stdin, stdout, stderr = ssh.exec_command('ls -l /configBackup-test-7.15-2024-06-10*.backup')
+        stdin, stdout, stderr = ssh.exec_command(f'ls -l /configBackup-{identity}-{system_version}-{current_date}*.backup')
         remote_backup_files_info = stdout.read().decode().splitlines()
 
         # Fetch each matching .backup file individually
@@ -83,7 +80,6 @@ def fetch_files_from_router(ssh, local_export, local_backup):
             if remote_file_info.startswith('-'):
                 # Fetch the .backup file
                 scp.get(remote_file_name, local_backup)
-
 
 
 
