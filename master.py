@@ -11,17 +11,13 @@ from googleapiclient.http import MediaFileUpload
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
 # MikroTik Router Details
-router_ip = '192.168.137.61'
+router_ip = '192.168.137.110'
 router_user = 'python'
 router_password = 'zaq1@WSX'
 
 
-current_time = datetime.now().strftime("%H-%M-%S")
 current_date = datetime.now().strftime("%Y-%m-%d")
 
-# Paths for local files
-local_export_file = fr'C:\Users\User\Desktop\configexport-{identity}-{system_version}-{current_date}-{current_time}.rsc'
-local_backup_file = fr'C:\Users\User\Desktop\configBackup-{identity}-{system_version}-{current_date}-{current_time}.backup'
 
 def create_ssh_client(server, user, password):
     ssh = paramiko.SSHClient()
@@ -30,10 +26,35 @@ def create_ssh_client(server, user, password):
     ssh.connect(server, username=user, password=password)
     return ssh
 
-def run_mikrotik_script(ssh):
+def retrieve_about_info(ssh):
+    # Command to get the system version
+    get_system_version = ':put [system/package/update/get installed-version];'
+    # Command to get the identity
+    get_identity = ':put [system/identity/get name]'
+
+    # Execute the commands
+    stdin, stdout, stderr = ssh.exec_command(get_system_version)
+    system_version = stdout.read().decode().strip()
+
+    stdin, stdout, stderr = ssh.exec_command(get_identity)
+    identity = stdout.read().decode().strip()
+
+    # Debug prints to check the output
+    print(f'--{system_version}--ver type={type(system_version)}')
+    print(f'--{identity}--id type={type(identity)}')
+
+    # Combine the information and split it into a list
+    info = system_version + " " + identity
+    print(f'--{info}---')
+    info_list = info.split(' ')
+    print(f'info_list: {info_list}')
+
+    return info_list
+
+def run_mikrotik_script(ssh,current_time):
     # Commands to run
-    command = """
-    :local identity [/system identity get name];:local date [system/clock/get date];:local time [system/clock/get time];:local version [system/package/update/get installed-version];:local fileNameExport;:local fileNameBackup;:set fileNameExport ("configExport-".$identity."-".$version."-".$date."-".$time);:set fileNameBackup ("configBackup-".$identity."-".$version."-".$date."-".$time);/export file=$fileNameExport;/system backup save name=$fileNameBackup;
+    command = f"""
+    :local identity [/system identity get name];:local date [system/clock/get date];:local version [system/package/update/get installed-version];:local fileNameExport;:local fileNameBackup;:set fileNameExport ("configExport-".$identity."-".$version."-".$date."-".{current_time});:set fileNameBackup ("configBackup-".$identity."-".$version."-".$date."-".$time);/export file=$fileNameExport;/system backup save name=$fileNameBackup;
     """
     # log  executing
     stdin, stdout, stderr = ssh.exec_command(command)
@@ -95,19 +116,49 @@ def upload_to_drive(service, local_file_path, drive_folder_id=None):
     }
     media = MediaFileUpload(local_file_path, mimetype='application/octet-stream')
     file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-    print(f"File ID: {file.get('id')} uploaded to Google Drive.")
+    print(f"File ID: {file.get('id')}, Name: {file.get('name')} uploaded to Google Drive.")
+    if drive_folder_id:
+        print(f"Uploaded to folder ID: {drive_folder_id}")
+    else:
+        print("Uploaded to the root directory.")
 
 def main():
+    
+    tmp_time = datetime.now().strftime("%H-%M-%S")
+    current_time = tmp_time
     # Create SSH client
     ssh = create_ssh_client(router_ip, router_user, router_password)
 
+    # Retrieving information about current hardware
+    # Retrieving information about current hardware
+    info = retrieve_about_info(ssh)
+    print(f'Final info list: {info}')
+
+    # Safely access the elements if the list has the expected number of elements
+    if len(info) >= 2:
+        system_version = info.pop(0)
+        identity = info.pop(0)  # Note: pop(0) is used here to avoid IndexError
+        print(f'System Version: {system_version}')
+        print(f'Identity: {identity}')
+    else:
+        print(f"Error: Expected at least 2 elements in info list, but got {len(info)} elements")
+    
+    local_export_file = fr'C:\Users\User\Desktop\configExport-{identity}-{system_version}-{current_date}-{current_time}.rsc'
+    local_backup_file = fr'C:\Users\User\Desktop\configBackup-{identity}-{system_version}-{current_date}-{current_time}.backup'
+
+
     # Run MikroTik script to generate export and backup files
-    output = run_mikrotik_script(ssh)
+    run_mikrotik_script(ssh,current_time)
 
     # Fetch files from MikroTik router to local PC
     fetch_files_from_router(ssh, local_export_file, local_backup_file, identity, system_version)
 
     ssh.close()
+    #Uploading to GoogleDrive
+    service = get_drive_service()
+    upload_to_drive(service, local_export_file)
+    upload_to_drive(service, local_backup_file)
+
 
 if __name__ == '__main__':
     main()
