@@ -1,4 +1,5 @@
 import os
+import time
 import paramiko
 from scp import SCPClient
 from datetime import datetime
@@ -9,15 +10,6 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
-
-# MikroTik Router Details
-router_ip = '192.168.137.110'
-router_user = 'python'
-router_password = 'zaq1@WSX'
-
-
-current_date = datetime.now().strftime("%Y-%m-%d")
-
 
 def create_ssh_client(server, user, password):
     ssh = paramiko.SSHClient()
@@ -40,21 +32,21 @@ def retrieve_about_info(ssh):
     identity = stdout.read().decode().strip()
 
     # Debug prints to check the output
-    print(f'--{system_version}--ver type={type(system_version)}')
-    print(f'--{identity}--id type={type(identity)}')
+    # print(f'--{system_version}--ver type={type(system_version)}')
+    # print(f'--{identity}--id type={type(identity)}')
 
     # Combine the information and split it into a list
     info = system_version + " " + identity
-    print(f'--{info}---')
+    # print(f'--{info}---')
     info_list = info.split(' ')
-    print(f'info_list: {info_list}')
+    # print(f'info_list: {info_list}')
 
     return info_list
 
 def run_mikrotik_script(ssh,current_time):
     # Commands to run
     command = f"""
-    :local identity [/system identity get name];:local date [system/clock/get date];:local version [system/package/update/get installed-version];:local fileNameExport;:local fileNameBackup;:set fileNameExport ("configExport-".$identity."-".$version."-".$date."-".{current_time});:set fileNameBackup ("configBackup-".$identity."-".$version."-".$date."-".$time);/export file=$fileNameExport;/system backup save name=$fileNameBackup;
+    :local identity [/system identity get name];:local date [system/clock/get date];:local time {current_time};:local version [system/package/update/get installed-version];:local fileNameExport;:local fileNameBackup;:set fileNameExport ("configExport-".$identity."-".$version."-".$date."-".$time);:set fileNameBackup ("configBackup-".$identity."-".$version."-".$date."-".$time);/export file=$fileNameExport;/system backup save name=$fileNameBackup;
     """
     # log  executing
     stdin, stdout, stderr = ssh.exec_command(command)
@@ -65,35 +57,28 @@ def run_mikrotik_script(ssh,current_time):
         raise Exception(f"Error running MikroTik script: {errors}")
     return output
 
-def fetch_files_from_router(ssh, local_export, local_backup, identity, system_version):
+def list_files_on_router(ssh):
+    stdin, stdout, stderr = ssh.exec_command('file print')
+    files = stdout.read().decode()
+    print("Files on the MikroTik router:\n", files)
+    return files
+
+def fetch_files_from_router(ssh, local_export_file,local_backup_file,export_filename, backup_filename):
     with SCPClient(ssh.get_transport()) as scp:
-        # List .rsc files on the router with detailed information
-        stdin, stdout, stderr = ssh.exec_command(f'ls -l /configExport-{identity}-{system_version}-{current_date}*.rsc')
-        remote_rsc_files_info = stdout.read().decode().splitlines()
+        # Creating delay to give time for files to create
+        for i in range(5):
+            print(f'{i + 1} - delay')
+            time.sleep(1)
+        
+        list_files_on_router(ssh)
 
-        # Fetch each matching .rsc file individually
-        for remote_file_info in remote_rsc_files_info:
-            # Extract the file name from the detailed information
-            remote_file_name = remote_file_info.split()[-1]
-
-            # Check if the remote file is a regular file (not a directory)
-            if remote_file_info.startswith('-'):
-                # Fetch the .rsc file
-                scp.get(remote_file_name, local_export)
-
-        # List .backup files on the router with detailed information
-        stdin, stdout, stderr = ssh.exec_command(f'ls -l /configBackup-{identity}-{system_version}-{current_date}*.backup')
-        remote_backup_files_info = stdout.read().decode().splitlines()
-
-        # Fetch each matching .backup file individually
-        for remote_file_info in remote_backup_files_info:
-            # Extract the file name from the detailed information
-            remote_file_name = remote_file_info.split()[-1]
-
-            # Check if the remote file is a regular file (not a directory)
-            if remote_file_info.startswith('-'):
-                # Fetch the .backup file
-                scp.get(remote_file_name, local_backup)
+        # Fetch files from the router and save to the local path
+        print(f"Fetching {export_filename} to {local_export_file}")
+        scp.get(export_filename, local_export_file)
+        print(f"Fetching {backup_filename} to {local_backup_file}")
+        scp.get(backup_filename, local_backup_file)
+        scp.close()
+        
 
 def get_drive_service():
     creds = None
@@ -123,35 +108,47 @@ def upload_to_drive(service, local_file_path, drive_folder_id=None):
         print("Uploaded to the root directory.")
 
 def main():
-    
+
+    # MikroTik Router Details
+    router_ip = '192.168.137.28'
+    router_user = 'python'
+    router_password = 'zaq1@WSX'
+
+    tmp_date = datetime.now().strftime("%Y-%m-%d")
+    current_date = tmp_date
     tmp_time = datetime.now().strftime("%H-%M-%S")
     current_time = tmp_time
+
+
     # Create SSH client
     ssh = create_ssh_client(router_ip, router_user, router_password)
 
     # Retrieving information about current hardware
-    # Retrieving information about current hardware
     info = retrieve_about_info(ssh)
-    print(f'Final info list: {info}')
+    # print(f'Final info list: {info}')
 
     # Safely access the elements if the list has the expected number of elements
     if len(info) >= 2:
         system_version = info.pop(0)
-        identity = info.pop(0)  # Note: pop(0) is used here to avoid IndexError
-        print(f'System Version: {system_version}')
-        print(f'Identity: {identity}')
+        identity = info.pop(0) 
+        print(f'---------------------------------\nCurrent Hardware Infomation:\nSystem Version: {system_version}')
+        print(f'Identity: {identity}\n---------------------------------')
     else:
         print(f"Error: Expected at least 2 elements in info list, but got {len(info)} elements")
     
-    local_export_file = fr'C:\Users\User\Desktop\configExport-{identity}-{system_version}-{current_date}-{current_time}.rsc'
-    local_backup_file = fr'C:\Users\User\Desktop\configBackup-{identity}-{system_version}-{current_date}-{current_time}.backup'
+    export_filename = f"configExport-{identity}-{system_version}-{current_date}-{current_time}.rsc"
+    backup_filename = f"configBackup-{identity}-{system_version}-{current_date}-{current_time}.backup"
+    
+    
+    local_export_file = fr'C:\Users\User\Desktop\{export_filename}'
+    local_backup_file = fr'C:\Users\User\Desktop\{backup_filename}'
 
 
     # Run MikroTik script to generate export and backup files
     run_mikrotik_script(ssh,current_time)
-
+    
     # Fetch files from MikroTik router to local PC
-    fetch_files_from_router(ssh, local_export_file, local_backup_file, identity, system_version)
+    fetch_files_from_router(ssh, local_export_file, local_backup_file, export_filename, backup_filename)
 
     ssh.close()
     #Uploading to GoogleDrive
