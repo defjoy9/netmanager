@@ -87,48 +87,66 @@ def upload_to_drive(service, local_file_path, drive_folder_id=None):
 
 def main():
     # MikroTik Router Details
-    router_ip = '192.168.137.28'
-    router_user = 'python'
-    router_password = 'zaq1@WSX'
+    with open('data.json','r') as json_file:
+        data = json.load(json_file)
 
-    path = r'C:\Users\User\Desktop'
+    try:
+        #connect and authenticate to Google Drive
+        google_drive_service = get_drive_service()
+    except Exception as error:
+        print(f"--------------!! ERROR !! -------------- Can't authenticate.\nDetails:\n{error}")
 
-    #connect and authenticate to Google Drive
-    google_drive_service = get_drive_service()
+    for entry in data:
+        router_ip = entry.get('source_ip')
+        router_user = entry.get('user')
+        router_password = entry.get('password')
+    
+        # Przetwarzanie lub wyświetlanie wartości
+        print(f"--------------\nNow accessing ---> \nSource IP: {router_ip}, Logging in as: {router_user}\n--------------")
 
-# to jest do opakownaia w foreach z talicy z danymi urzadzen
-    current_date = datetime.now().strftime("%Y-%m-%d")
-    current_time = datetime.now().strftime("%H-%M-%S")
-    # Create SSH client
-    ssh = create_ssh_client(router_ip, router_user, router_password)
-    info = json.loads(retrieve_about_info(ssh))
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_time = datetime.now().strftime("%H-%M-%S")
+        
+        try:
+            # Create SSH client
+            ssh = create_ssh_client(router_ip, router_user, router_password)
+            
+            path = r'C:\Users\User\Desktop'
+            
+            info = json.loads(retrieve_about_info(ssh))
 
-    export_filename = f"configExport-{info['identity']}-{info['version']}-{current_date}-{current_time}.rsc"
-    backup_filename = f"configBackup-{info['identity']}-{info['version']}-{current_date}-{current_time}.backup"
+            export_filename = f"configExport-{info['identity']}-{info['version']}-{current_date}-{current_time}.rsc"
+            backup_filename = f"configBackup-{info['identity']}-{info['version']}-{current_date}-{current_time}.backup"
 
-    local_export_file = f'{path}\\{export_filename}'
-    local_backup_file = f'{path}\\{backup_filename}'
+            local_export_file = f'{path}\\{export_filename}'
+            local_backup_file = f'{path}\\{backup_filename}'
 
-    commands =[
-        f"/export file={export_filename};",
-        f"/system backup save name={backup_filename};"
-    ]
+            commands =[
+                f"/export file={export_filename};",
+                f"/system backup save name={backup_filename};"
+            ]
 
-    for c in commands:
-        run_mikrotik_command_viaSSH(ssh, c)
+            for command in commands:
+                run_mikrotik_command_viaSSH(ssh, command)
 
-    time.sleep(5)
+            time.sleep(5)
 
-    # downloading the backup/export files from router
-    get_file_viaSCP (ssh, export_filename, local_export_file)
-    get_file_viaSCP (ssh, backup_filename, local_backup_file)
+            # downloading the backup/export files from router
+            get_file_viaSCP (ssh, export_filename, local_export_file)
+            get_file_viaSCP (ssh, backup_filename, local_backup_file)
 
-    time.sleep(5)
+            time.sleep(5)
 
-    upload_to_drive(google_drive_service, local_export_file)
-    upload_to_drive(google_drive_service, local_backup_file)
+            upload_to_drive(google_drive_service, local_export_file)
+            upload_to_drive(google_drive_service, local_backup_file)
 
-    print ("Script finished.")
+        except TimeoutError:
+            print(f"TIMEOUT - Can't reach host {router_ip}")
+        except Exception as error:
+            print(f"--------------!! ERROR !! --------------\nDetails:\n{error}")
+
+    print ("^^^^^^^^^^^^^^\nScript finished.")
+
 
 if __name__ == '__main__':
     main()
