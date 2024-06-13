@@ -100,7 +100,7 @@ def upload_to_drive(service, local_file_path, drive_folder_id=None):
         'parents': [drive_folder_id] if drive_folder_id else []
     }
     media = MediaFileUpload(local_file_path, mimetype='application/octet-stream')
-    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    file = service.files().create(body=file_metadata, media_body=media, fields='id, name').execute()
     print(f"File ID: {file.get('id')}, Name: {file.get('name')} uploaded to Google Drive.")
     if drive_folder_id:
         print(f"Uploaded to folder ID: {drive_folder_id}")
