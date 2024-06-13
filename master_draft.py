@@ -1,5 +1,6 @@
 import os
 import time
+import logging
 import paramiko
 from scp import SCPClient
 from datetime import datetime
@@ -10,6 +11,11 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
+
+    #log config
+    #log_file_path = ''
+    #logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
 
 def create_ssh_client(server, user, password):
     ssh = paramiko.SSHClient()
@@ -36,23 +42,27 @@ def retrieve_about_info(ssh):
     # print(f'--{identity}--id type={type(identity)}')
 
     # Combine the information and split it into a list
+    # system_version = '7.12.2'
+    # identity = "ala ma kota" 
+
+
     info = system_version + " " + identity
     # print(f'--{info}---')
     info_list = info.split(' ')
     # print(f'info_list: {info_list}')
 
-    return info_list
+    return info_list # tu wracane sa juz dane w postaci zserializowaniej (JSON)
 
 def run_mikrotik_script(ssh,current_time):
     # Commands to run
     command = f"""
     :local identity [/system identity get name];:local date [system/clock/get date];:local time {current_time};:local version [system/package/update/get installed-version];:local fileNameExport;:local fileNameBackup;:set fileNameExport ("configExport-".$identity."-".$version."-".$date."-".$time);:set fileNameBackup ("configBackup-".$identity."-".$version."-".$date."-".$time);/export file=$fileNameExport;/system backup save name=$fileNameBackup;
     """
-    # log  executing
+    # log  executing ???
     stdin, stdout, stderr = ssh.exec_command(command)
     output = stdout.read().decode()
     errors = stderr.read().decode()
-    # log  errors/output
+    # log  errors/output ???
     if errors:
         raise Exception(f"Error running MikroTik script: {errors}")
     return output
@@ -127,7 +137,7 @@ def main():
     info = retrieve_about_info(ssh)
     # print(f'Final info list: {info}')
 
-    # Safely access the elements if the list has the expected number of elements
+    # --
     if len(info) >= 2:
         system_version = info.pop(0)
         identity = info.pop(0) 
