@@ -90,6 +90,9 @@ def main():
     with open('data.json','r') as json_file:
         data = json.load(json_file)
 
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    current_time = datetime.now().strftime("%H-%M-%S")
+    
     try:
         #connect and authenticate to Google Drive
         google_drive_service = get_drive_service()
@@ -104,8 +107,7 @@ def main():
         # Przetwarzanie lub wyświetlanie wartości
         print(f"--------------\nNow accessing ---> \nSource IP: {router_ip}, Logging in as: {router_user}\n--------------")
 
-        current_date = datetime.now().strftime("%Y-%m-%d")
-        current_time = datetime.now().strftime("%H-%M-%S")
+        
         
         try:
             # Create SSH client

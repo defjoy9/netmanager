@@ -1,22 +1,17 @@
 [
     {
-        "source_ip": "192.168.137.28",
+        "source_ip": "192.168.1.198",
+        "user": "py",
+        "password": "123"
+    },
+    {
+        "source_ip": "192.168.1.199",
         "user": "python",
         "password": "zaq1@WSX"
     },
     {
-        "source_ip": "10.0.0.1",
-        "user": "admin",
-        "password": "P@ssw0rd!"
-    },
-    {
-        "source_ip": "172.16.0.1",
-        "user": "guest",
-        "password": "guest123"
-    },
-    {
-        "source_ip": "192.0.2.1",
-        "user": "developer",
-        "password": "dev@123"
+        "source_ip": "192.168.1.200",
+        "user": "python",
+        "password": "zaq1@WSX"
     }
 ]
