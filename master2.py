@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import sqlite3
 import logging
 import paramiko
 from scp import SCPClient
@@ -86,9 +87,11 @@ def upload_to_drive(service, local_file_path, drive_folder_id=None):
 # tu stant programu
 
 def main():
-    # MikroTik Router Details
-    with open('data.json','r') as json_file:
-        data = json.load(json_file)
+    # Accessing database
+    conn = sqlite3.connect('network_devices.db')
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM devices')
+    device_info = cur.fetchall()
 
     current_date = datetime.now().strftime("%Y-%m-%d")
     current_time = datetime.now().strftime("%H-%M-%S")
@@ -99,15 +102,14 @@ def main():
     except Exception as error:
         print(f"--------------!! ERROR !! -------------- Can't authenticate.\nDetails:\n{error}")
 
-    for entry in data:
-        router_ip = entry.get('source_ip')
-        router_user = entry.get('user')
-        router_password = entry.get('password')
+    for item in device_info:
+        router_ip = f'{item[1]}'
+        router_user = f'{item[2]}'
+        router_password = f'{item[3]}'
     
         # Przetwarzanie lub wyświetlanie wartości
         print(f"--------------\nNow accessing ---> \nSource IP: {router_ip}, Logging in as: {router_user}\n--------------")
 
-        
         
         try:
             # Create SSH client
