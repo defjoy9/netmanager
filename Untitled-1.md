@@ -1,6 +1,6 @@
 
-- otworzenie pliku data.json
-- !!! Wczytanie danych z Bazdy Danych SQLite zamiast .json
+
+- Wczytanie danych z Bazdy Danych SQLite
 w petli do wszyskich urzadzniach MT 
     - polaczenie SSH do mikrotik
     - zebrac info o wersji softu i nazwie urzadzenia
@@ -15,6 +15,9 @@ w petli do wszyskich urzadzniach MT
             usuwamy
         jak nie
             zostawiamy
+    - usuwanie plików z backups jak są 1 dzień starsze
+    
+
     - zamkniecie polaczenia SSH -->
 
 

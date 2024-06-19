@@ -4,7 +4,7 @@ import time
 import logging
 import paramiko
 from scp import SCPClient
-from datetime import datetime
+from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -48,17 +48,49 @@ def run_mikrotik_command_viaSSH (ssh, command):
         raise Exception(f"Error running MikroTik script: {errors}")
     return output
 
-def delete_mikrotik_files(ssh):
-    stdin, stdout, stderr = ssh.exec_command("file/print")
+def date_difference(string_date, how_old):
+    current_date = datetime.now().date()  # Get current date
+    check_date = datetime.strptime(string_date, "%Y-%m-%d").date()  # Convert string_date to datetime object
+
+    difference = current_date - check_date  # Calculate timedelta
+
+    if difference < timedelta(days=how_old):
+        #print("Date is less than 1 day old")
+        return False
+    else:
+        #print("Date is equal or more than 1 day old")
+        return True
+
+
+def delete_mikrotik_files(ssh,filename='configExport-test-cyfrowe-7.15-2024-06-18-14-27-49'):
+    stdin, stdout, stderr = ssh.exec_command(f"file/find name~\"{filename}\"")
     output = stdout.read().decode()
     errors = stderr.read().decode()
-    files = []
-    for line in output.splitlines():
-        # print(f"This is inside {line}")
-        if line.strip():
-            parts = line.split()
-            print(f"This is OUTside line.strip {line}")
+    
+    if errors:
+        print(f"Error: {errors}")
+        return
+    
+    lines = output.splitlines()
+    print(lines)
+# Usage
+# delete_mikrotik_files(ssh, "filename1")
 
+
+# Usage
+# delete_mikrotik_files(ssh, "filename1")
+
+
+# Example usage
+# import paramiko
+# ssh = paramiko.SSHClient()
+# ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+# ssh.connect('your_mikrotik_host', username='your_username', password='your_password')
+# delete_mikrotik_files(ssh)
+# ssh.close()
+
+
+            
 
 def get_file_viaSCP (ssh, src, dst):
     with SCPClient(ssh.get_transport()) as scp:
@@ -99,8 +131,8 @@ def upload_to_drive(service, local_file_path, drive_folder_id=None):
 
 def main():
     # MikroTik Router Details
-    with open('testdata.json','r') as json_file:
-        data = json.load(json_file)
+    # with open('testdata.json','r') as json_file:
+    #     data = json.load(json_file)
 
     current_date = datetime.now().strftime("%Y-%m-%d")
     current_time = datetime.now().strftime("%H-%M-%S")
@@ -108,7 +140,7 @@ def main():
     # router_ip = entry.get('source_ip')
     # router_user = entry.get('user')
     # router_password = entry.get('password')
-    router_ip = "192.168.137.109"
+    router_ip = "192.168.137.97"
     router_user = "python"
     router_password = "123"    
     # Przetwarzanie lub wyświetlanie wartości

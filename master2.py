@@ -5,7 +5,7 @@ import sqlite3
 import logging
 import paramiko
 from scp import SCPClient
-from datetime import datetime
+from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -72,7 +72,7 @@ def get_drive_service():
             token.write(creds.to_json())
     return build('drive', 'v3', credentials=creds)
 
-def upload_to_drive(service, local_file_path, drive_folder_id=None):
+def upload_to_drive(service, local_file_path, drive_folder_id='1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C'):
     file_metadata = {
         'name': os.path.basename(local_file_path),
         'parents': [drive_folder_id] if drive_folder_id else []
@@ -84,6 +84,34 @@ def upload_to_drive(service, local_file_path, drive_folder_id=None):
         print(f"Uploaded to folder ID: {drive_folder_id}")
     else:
         print("Uploaded to the root directory.")
+
+def check_date(date_to_check):
+    date_to_check = datetime.strptime(date_to_check,'%Y-%m-%d-%H-%M-%S')
+    current_date = datetime.now()
+    
+    if current_date - date_to_check <= timedelta(days=1): # less or equal
+        print(f"{current_date} - {date_to_check} < {timedelta(days=1)}")
+        return 0
+    else: #older than 1 day
+        print(f"{current_date} - {date_to_check} >= {timedelta(days=1)}")
+        return 1
+
+def delete_old_files(path):
+    for root,dirs,files in os.walk(path):
+        for filename in files:
+            if ".backup" in filename:
+                current_file_date = filename[-26:-7]
+                if check_date(current_file_date) == 1:
+                    print(f"{filename} is older than 1 day. Removing...")
+                    os.remove(f'{path}\\{filename}')
+            if ".rsc" in filename:
+                current_file_date = filename[-23:-4]
+                if check_date(current_file_date) == 1:
+                    print(f"{filename} is older than 1 day. Removing...")
+                    os.remove(f'{path}\\{filename}')
+    return 1
+
+
 # tu stant programu
 
 def main():
@@ -115,7 +143,7 @@ def main():
             # Create SSH client
             ssh = create_ssh_client(router_ip, router_user, router_password)
             
-            path = r'C:\Users\User\Desktop'
+            path = f"{os.getcwd()}\\backups\\"
             
             info = json.loads(retrieve_about_info(ssh))
 
