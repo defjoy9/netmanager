@@ -20,7 +20,7 @@ cur.execute('''
 # Step 4: Insert data into the table
 cur.execute('''
     INSERT INTO devices (ip_address, user_login, password, producent)
-    VALUES ('192.168.137.97', 'python', '123', 'Mikrotik')
+    VALUES ('192.168.137.14', 'python', '123', 'Mikrotik')
 ''')
 cur.execute('''
     INSERT INTO devices (ip_address, user_login, password, producent)
