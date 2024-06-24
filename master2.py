@@ -14,6 +14,8 @@ from googleapiclient.http import MediaFileUpload
 
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
+
+
 def create_ssh_client(server, user, password):
     ssh = paramiko.SSHClient()
     ssh.load_system_host_keys()
@@ -72,7 +74,7 @@ def get_drive_service():
             token.write(creds.to_json())
     return build('drive', 'v3', credentials=creds)
 
-def upload_to_drive(service, local_file_path, drive_folder_id='1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C'):
+def upload_to_drive(service, local_file_path, drive_folder_id):
     file_metadata = {
         'name': os.path.basename(local_file_path),
         'parents': [drive_folder_id] if drive_folder_id else []
@@ -85,9 +87,48 @@ def upload_to_drive(service, local_file_path, drive_folder_id='1jIkJ-v9g3z94cLAG
     else:
         print("Uploaded to the root directory.")
 
+def delete_oldest_files_in_googledrive(service, folder_id, max_file_count=30):
+    query = f"'{folder_id}' in parents and trashed=false"
+    results = service.files().list(
+        q=query,
+        pageSize=1000, # The maximum number of files to return per page.
+        fields="nextPageToken, files(id, name, createdTime)"
+    ).execute()
+    files = results.get('files', [])
+
+    # Sort files by creation date (oldest first)
+    files.sort(key=lambda x: x['createdTime'])
+    
+    print(f"Files in folder ID {folder_id} sorted by creation date (oldest to newest):")
+    for file in files:
+        print(f"ID: {file['id']}, Name: {file['name']}, Created Time: {file['createdTime']}")
+
+    file_count = len(files)
+    # Delete the specified number of oldest files
+    if file_count > max_file_count:
+        num_files_to_delete = file_count - max_file_count 
+        for file in files[:num_files_to_delete]:
+            try:
+                service.files().delete(fileId=file['id']).execute()
+                print(f"File ID: {file['id']} has been deleted.")
+            except Exception as e:
+                print(f"An error occurred: {e}")
+
+def delete_files(file_path):
+    if os.path.exists(file_path):
+        print(f"Removing {file_path}")
+        os.remove(file_path)
+        return 1
+    else:
+        print(f"Coudn't delete {file_path}")
+        return 0
 
 # tu stant programu
-def main():
+def main(): 
+    # log file setup
+    LogFilePath = "NetManagerLog.txt"
+    logging.basicConfig(filename=LogFilePath, level=logging.INFO, format='%(asctime)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
     # Accessing database
     conn = sqlite3.connect('network_devices.db')
     cur = conn.cursor()
@@ -97,6 +138,9 @@ def main():
     current_date = datetime.now().strftime("%Y-%m-%d")
     current_time = datetime.now().strftime("%H-%M-%S")
     
+
+    googledrive_folderid = "1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C"
+
     try:
         #connect and authenticate to Google Drive
         google_drive_service = get_drive_service()
@@ -142,6 +186,11 @@ def main():
 
             time.sleep(5)
 
+            upload_to_drive(google_drive_service, local_export_file)
+            upload_to_drive(google_drive_service, local_backup_file)
+
+            time.sleep(5)
+
             # Delete files from MikroTik
             try:
                 print(f"Deleting {export_filename} in MikroTik...")
@@ -151,23 +200,15 @@ def main():
             except Exception:
                 print(f"Error occured: {Exception}")
 
-            upload_to_drive(google_drive_service, local_export_file)
-            upload_to_drive(google_drive_service, local_backup_file)
-
-            time.sleep(5)
-
             # Delete files locally
-            if os.path.exists(local_export_file):
-                print(f"Removing {local_export_file}")
-                os.remove(local_export_file)
-            else:
-                print(f"Coudn't delete {local_export_file}")
-
-            if os.path.exists(local_backup_file):
-                print(f"Removing {local_backup_file}")
-                os.remove(local_backup_file)    
-            else:
-                print(f"Coudn't delete {local_backup_file}")
+            if delete_files(local_export_file) == 1:
+                # file has been deleted
+                print()
+            if delete_files(local_backup_file) == 0:
+                #file was not deleted
+                print()
+            # Delete X amount of files inside GoogleDrive
+            delete_oldest_files_in_googledrive(google_drive_service,googledrive_folderid,30)
 
         except TimeoutError:
             print(f"TIMEOUT - Can't reach host {router_ip}")
