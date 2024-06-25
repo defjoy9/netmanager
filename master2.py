@@ -99,20 +99,25 @@ def delete_oldest_files_in_googledrive(service, folder_id, max_file_count=30):
     # Sort files by creation date (oldest first)
     files.sort(key=lambda x: x['createdTime'])
     
-    print(f"Files in folder ID {folder_id} sorted by creation date (oldest to newest):")
-    for file in files:
-        print(f"ID: {file['id']}, Name: {file['name']}, Created Time: {file['createdTime']}")
-
     file_count = len(files)
+    deleted_files = []
+
     # Delete the specified number of oldest files
     if file_count > max_file_count:
         num_files_to_delete = file_count - max_file_count 
         for file in files[:num_files_to_delete]:
             try:
                 service.files().delete(fileId=file['id']).execute()
-                print(f"File ID: {file['id']} has been deleted.")
+                deleted_files.append({
+                    'id': file['id'],
+                    'name': file['name'],
+                    'createdTime': file['createdTime']
+                })
             except Exception as e:
-                print(f"An error occurred: {e}")
+                logging.error(f"An error occurred while deleting file ID: {file['id']}: {e}")
+    if file_count <= max_file_count:
+        logging.info(f"Skipping deleting files from GoogleDrive. File Count {file_count} <= Max file count {max_file_count}")
+    return deleted_files
 
 def delete_files(file_path):
     if os.path.exists(file_path):
@@ -125,27 +130,33 @@ def delete_files(file_path):
 
 # tu stant programu
 def main(): 
-    # log file setup
+    # variables
+    googledrive_folderid = "1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C" 
+    database_file = "network_devices.db"
     LogFilePath = "NetManagerLog.txt"
-    logging.basicConfig(filename=LogFilePath, level=logging.INFO, format='%(asctime)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-
-    # Accessing database
-    conn = sqlite3.connect('network_devices.db')
-    cur = conn.cursor()
-    cur.execute('SELECT * FROM devices')
-    device_info = cur.fetchall()
-
+    max_file_count_googledrive = 30  # Maximum number of files in GoogleDrive 
     current_date = datetime.now().strftime("%Y-%m-%d")
     current_time = datetime.now().strftime("%H-%M-%S")
+
+    logging.basicConfig(filename=LogFilePath, level=logging.INFO, format='%(asctime)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    logging.info("Starting script...")
     
-
-    googledrive_folderid = "1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C"
-
+    # Accessing database
     try:
-        #connect and authenticate to Google Drive
-        google_drive_service = get_drive_service()
+        conn = sqlite3.connect(database_file)
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM devices')
+        device_info = cur.fetchall()
+        logging.info(f"Accessing {database_file}")
     except Exception as error:
-        print(f"--------------!! ERROR !! -------------- Can't authenticate.\nDetails:\n{error}")
+        logging.error(error)
+
+    # Authenticating to GoogleDrive API
+    try:
+        google_drive_service = get_drive_service()
+        logging.info("Succesfully authenticated to GoogleDrive API")
+    except Exception as error:
+        logging.error(f"An error occured while trying to authenticate to GoogleDrive API: {error}")
 
     for item in device_info:
         router_ip = f'{item[1]}'
@@ -154,18 +165,24 @@ def main():
     
         # Przetwarzanie lub wyświetlanie wartości
         print(f"--------------\nNow accessing ---> \nSource IP: {router_ip}, Logging in as: {router_user}\n--------------")
-
+        logging.info(f"Trying to access Router IP: {router_ip} as User: {router_user}")
         
         try:
             # Create SSH client
             ssh = create_ssh_client(router_ip, router_user, router_password)
-            
+            logging.info(f"Successfully logged in to Router IP: {router_ip} as User: {router_user}")
+        
+        except Exception as error:
+            logging.error(f"An error occured while trying to connect to {router_ip} as {router_user}: {error}")
+
+        try:
             path = f"{os.getcwd()}\\"
             
             info = json.loads(retrieve_about_info(ssh))
 
             export_filename = f"configExport-{info['identity']}-{info['version']}-{current_date}-{current_time}.rsc"
             backup_filename = f"configBackup-{info['identity']}-{info['version']}-{current_date}-{current_time}.backup"
+            logging.info(f"Gathered information about {router_ip}: Identity: {info['identity']} System Version: {info['version']}")
 
             local_export_file = f'{path}\\{export_filename}'
             local_backup_file = f'{path}\\{backup_filename}'
@@ -174,49 +191,77 @@ def main():
                 f"/export file={export_filename};",
                 f"/system backup save name={backup_filename};"
             ]
-
-            for command in commands:
-                run_mikrotik_command_viaSSH(ssh, command)
+            try:
+                for command in commands:
+                    run_mikrotik_command_viaSSH(ssh, command)
+            except Exception as error:
+                logging.error(f"An error occurred while trying to run commands {error}")
 
             time.sleep(5)
 
             # downloading the backup/export files from router
-            get_file_viaSCP (ssh, export_filename, local_export_file)
-            get_file_viaSCP (ssh, backup_filename, local_backup_file)
+            try:
+                get_file_viaSCP (ssh, export_filename, local_export_file)
+                logging.info(f"Successfully copied {export_filename} to {local_export_file}")
+                get_file_viaSCP (ssh, backup_filename, local_backup_file)
+                logging.info(f"Successfully copied {backup_filename} to {local_backup_file}")
+
+            except Exception as erorr:
+                logging.error(f"An error occured while trying to copy files via SCP: {error}")
 
             time.sleep(5)
-
-            upload_to_drive(google_drive_service, local_export_file)
-            upload_to_drive(google_drive_service, local_backup_file)
-
+            
+            try: 
+                upload_to_drive(google_drive_service, local_export_file,googledrive_folderid)
+                upload_to_drive(google_drive_service, local_backup_file,googledrive_folderid)
+            except Exception as error:
+                logging.error(f"An error occured while trying to upload files to GoogleDrive API: {error}")
+            
             time.sleep(5)
-
+            
             # Delete files from MikroTik
             try:
                 print(f"Deleting {export_filename} in MikroTik...")
+                logging.info(f"Deleting {export_filename} from MikroTik")
                 run_mikrotik_command_viaSSH(ssh,f'file/remove {export_filename}')
+                
                 print(f"Deleting {backup_filename} in MikroTik...")
+                logging.info(f"Deleting {backup_filename} from MikroTik")
                 run_mikrotik_command_viaSSH(ssh,f'file/remove {backup_filename}')
-            except Exception:
-                print(f"Error occured: {Exception}")
+            except Exception as error:
+                print(f"Error occured: {error}")
+                logging.error(f"Problem occured while trying to delete files from MikroTik: {erorr}")
 
             # Delete files locally
-            if delete_files(local_export_file) == 1:
-                # file has been deleted
-                print()
-            if delete_files(local_backup_file) == 0:
-                #file was not deleted
-                print()
-            # Delete X amount of files inside GoogleDrive
-            delete_oldest_files_in_googledrive(google_drive_service,googledrive_folderid,30)
+            try:
+                delete_files(local_export_file)
+                print(f"{local_export_file} has been deleted")
+                logging.info(f"Deleting {local_export_file} in {path}")
+            except Exception as erorr:
+                logging.error(f"Problem occured while trying to delete {local_export_file} locally: {error}")
+            try:
+                delete_files(local_backup_file)
+                logging.info(f"Deleting {local_backup_file} in {path}")
+            except Exception as error:
+                logging.error(f"Problem occured while trying to delete {local_backup_file} loaclly: {error}")
 
+            try:
+            # Delete X amount of files inside GoogleDrive
+                deleted_files = delete_oldest_files_in_googledrive(google_drive_service, googledrive_folderid, max_file_count_googledrive)
+                for file in deleted_files:
+                    logging.info(f"Deleted file ID: {file['id']}, Name: {file['name']}, Created Time: {file['createdTime']}")
+
+            except Exception as error:  
+                logging.error(f"An error occured whlie trying to delete files from GoogleDrive: {error}")
         except TimeoutError:
             print(f"TIMEOUT - Can't reach host {router_ip}")
         except Exception as error:
             print(f"--------------!! ERROR !! --------------\nDetails:\n{error}")
         finally:
+            logging.info("Script Finished, exiting...")
             ssh.close()
             conn.close()
+            
 
     print ("^^^^^^^^^^^^^^\nScript finished.")
 

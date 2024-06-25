@@ -47,20 +47,27 @@ def delete_oldest_files_in_googledrive(service, folder_id, max_file_count=30):
     # Sort files by creation date (oldest first)
     files.sort(key=lambda x: x['createdTime'])
     
-    print(f"Files in folder ID {folder_id} sorted by creation date (oldest to newest):")
-    for file in files:
-        print(f"ID: {file['id']}, Name: {file['name']}, Created Time: {file['createdTime']}")
-
     file_count = len(files)
+    deleted_files = []
+
     # Delete the specified number of oldest files
     if file_count > max_file_count:
         num_files_to_delete = file_count - max_file_count 
         for file in files[:num_files_to_delete]:
             try:
                 service.files().delete(fileId=file['id']).execute()
-                print(f"File ID: {file['name']} has been deleted.")
+                deleted_files.append({
+                    'id': file['id'],
+                    'name': file['name'],
+                    'createdTime': file['createdTime']
+                })
             except Exception as e:
-                print(f"An error occurred: {e}")
+                logging.error(f"An error occurred while deleting file ID: {file['id']}: {e}")
+    if file_count <= max_file_count:
+        logging.info(f"Skipping deleting files from GoogleDrive. File Count {file_count} <= Max file count {max_file_count}")
+    return deleted_files
+
+    
 
 def main():
     service = get_drive_service()
@@ -68,7 +75,7 @@ def main():
     # Folder ID and number of oldest files to delete
     folder_id = '1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C'
     
-    delete_oldest_files_in_googledrive(service, folder_id,30)
+    delete_oldest_files_in_googledrive(service, folder_id,26)
 
 if __name__ == '__main__':
     main()
