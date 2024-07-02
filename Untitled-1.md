@@ -37,14 +37,17 @@ Loading variables
 	
 2. Trying to connect to a GoogleDrive API
 	Fail:
-	- Stop the script
+	- Stop the script    >>>> może kontynuować tylko ominąć wszystkie kroki dotyczące googledrvive api??
 3. Connecting to a device via SSH
 	Fail:
 	- Skip device
 	(if still error) - Stop the script
+?? Robić error handeling do gather info?
 4. Running commands
 	Fail:
 	- Stop the script
+    >>>> Przyjełam strategię, że jak Output jest pusty to oznacza że nie ma żadnych errorów. A jak jest jakaś wartość w output to oznacza że jest error
+    >>?> MikroTik Scripting nie jest w stanie zapisać error output, co oznacza, że nie mogę zrobić if'ów itp. którę by zrobiły error handling. Mamy dwie opcje albo ignorujemy w tym przypadku error handling albo włączamy do skryptu funkcje .rsc która zapisuje output do pliku stworzonego na urządzeniu i bierzemy skrypt który później zczytuje informację tam podane. overkill?
 5. Copying files via SCP
 	Fail:
 	- Stop the script

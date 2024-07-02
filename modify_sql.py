@@ -18,9 +18,19 @@ cur = conn.cursor()
 
 cur.execute('''
     UPDATE devices
-    SET ip_address="192.168.137.182"
-    WHERE ip_address="192.168.137.14"
+    SET ip_address="192.168.137.92"
+    WHERE ip_address="192.168.137.121"
 ''')
+#cur.execute('''
+#     UPDATE devices
+#     SET user_login="python"
+#     WHERE user_login="py"
+# ''')
+# cur.execute('''
+#     UPDATE devices
+#     SET user_login="python"
+#     WHERE ip_address="192.168.137.40"
+# ''')
 
 conn.commit()
 

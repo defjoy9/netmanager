@@ -1,9 +1,11 @@
 import os
+import json
 import time
+import sqlite3
 import logging
 import paramiko
 from scp import SCPClient
-from datetime import datetime
+from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -12,9 +14,6 @@ from googleapiclient.http import MediaFileUpload
 
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
-    #log config
-    #log_file_path = ''
-    #logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 
 def create_ssh_client(server, user, password):
@@ -25,9 +24,8 @@ def create_ssh_client(server, user, password):
     return ssh
 
 def retrieve_about_info(ssh):
-    # Command to get the system version
+
     get_system_version = ':put [system/package/update/get installed-version];'
-    # Command to get the identity
     get_identity = ':put [system/identity/get name]'
 
     # Execute the commands
@@ -36,59 +34,28 @@ def retrieve_about_info(ssh):
 
     stdin, stdout, stderr = ssh.exec_command(get_identity)
     identity = stdout.read().decode().strip()
+# Tworzenie pustego słownika z kluczami 'version' i 'identity'
+    result = {
+        'version': system_version,
+        'identity': identity
+    }
 
-    # Debug prints to check the output
-    # print(f'--{system_version}--ver type={type(system_version)}')
-    # print(f'--{identity}--id type={type(identity)}')
+    return json.dumps(result)
 
-    # Combine the information and split it into a list
-    # system_version = '7.12.2'
-    # identity = "ala ma kota" 
-
-
-    info = system_version + " " + identity
-    # print(f'--{info}---')
-    info_list = info.split(' ')
-    # print(f'info_list: {info_list}')
-
-    return info_list # tu wracane sa juz dane w postaci zserializowaniej (JSON)
-
-def run_mikrotik_script(ssh,current_time):
-    # Commands to run
-    command = f"""
-    :local identity [/system identity get name];:local date [system/clock/get date];:local time {current_time};:local version [system/package/update/get installed-version];:local fileNameExport;:local fileNameBackup;:set fileNameExport ("configExport-".$identity."-".$version."-".$date."-".$time);:set fileNameBackup ("configBackup-".$identity."-".$version."-".$date."-".$time);/export file=$fileNameExport;/system backup save name=$fileNameBackup;
-    """
-    # log  executing ???
+def run_mikrotik_command_viaSSH (ssh, command):
     stdin, stdout, stderr = ssh.exec_command(command)
     output = stdout.read().decode()
-    errors = stderr.read().decode()
-    # log  errors/output ???
-    if errors:
-        raise Exception(f"Error running MikroTik script: {errors}")
+
     return output
 
-def list_files_on_router(ssh):
-    stdin, stdout, stderr = ssh.exec_command('file print')
-    files = stdout.read().decode()
-    print("Files on the MikroTik router:\n", files)
-    return files
-
-def fetch_files_from_router(ssh, local_export_file,local_backup_file,export_filename, backup_filename):
+def get_file_viaSCP (ssh, src, dst):
     with SCPClient(ssh.get_transport()) as scp:
-        # Creating delay to give time for files to create
-        for i in range(5):
-            print(f'{i + 1} - delay')
-            time.sleep(1)
-        
-        list_files_on_router(ssh)
-
         # Fetch files from the router and save to the local path
-        print(f"Fetching {export_filename} to {local_export_file}")
-        scp.get(export_filename, local_export_file)
-        print(f"Fetching {backup_filename} to {local_backup_file}")
-        scp.get(backup_filename, local_backup_file)
+        print(f"Fetching {src} to {dst}")
+        scp.get(src, dst)
         scp.close()
-        
+    
+    return 1
 
 def get_drive_service():
     creds = None
@@ -104,7 +71,7 @@ def get_drive_service():
             token.write(creds.to_json())
     return build('drive', 'v3', credentials=creds)
 
-def upload_to_drive(service, local_file_path, drive_folder_id=None):
+def upload_to_drive(service, local_file_path, drive_folder_id):
     file_metadata = {
         'name': os.path.basename(local_file_path),
         'parents': [drive_folder_id] if drive_folder_id else []
@@ -117,54 +84,182 @@ def upload_to_drive(service, local_file_path, drive_folder_id=None):
     else:
         print("Uploaded to the root directory.")
 
-def main():
+def delete_oldest_files_in_googledrive(service, folder_id, max_file_count=30):
+    query = f"'{folder_id}' in parents and trashed=false"
+    results = service.files().list(
+        q=query,
+        pageSize=1000, # The maximum number of files to return per page.
+        fields="nextPageToken, files(id, name, createdTime)"
+    ).execute()
+    files = results.get('files', [])
 
-    # MikroTik Router Details
-    router_ip = '192.168.137.28'
-    router_user = 'python'
-    router_password = 'zaq1@WSX'
+    # Sort files by creation date (oldest first)
+    files.sort(key=lambda x: x['createdTime'])
+    
+    file_count = len(files)
+    deleted_files = []
 
-    tmp_date = datetime.now().strftime("%Y-%m-%d")
-    current_date = tmp_date
-    tmp_time = datetime.now().strftime("%H-%M-%S")
-    current_time = tmp_time
+    # Delete the specified number of oldest files
+    if file_count > max_file_count:
+        num_files_to_delete = file_count - max_file_count 
+        for file in files[:num_files_to_delete]:
+            try:
+                service.files().delete(fileId=file['id']).execute()
+                deleted_files.append({
+                    'id': file['id'],
+                    'name': file['name'],
+                    'createdTime': file['createdTime']
+                })
+            except Exception as e:
+                logging.error(f"An error occurred while deleting file ID: {file['id']}: {e}")
+    if file_count <= max_file_count:
+        logging.info(f"Skipping deleting files from GoogleDrive. File Count {file_count} <= Max file count {max_file_count}")
+    return deleted_files
 
-
-    # Create SSH client
-    ssh = create_ssh_client(router_ip, router_user, router_password)
-
-    # Retrieving information about current hardware
-    info = retrieve_about_info(ssh)
-    # print(f'Final info list: {info}')
-
-    # --
-    if len(info) >= 2:
-        system_version = info.pop(0)
-        identity = info.pop(0) 
-        print(f'---------------------------------\nCurrent Hardware Infomation:\nSystem Version: {system_version}')
-        print(f'Identity: {identity}\n---------------------------------')
+def delete_files(file_path):
+    if os.path.exists(file_path):
+        print(f"Removing {file_path}")
+        os.remove(file_path)
+        return 1
     else:
-        print(f"Error: Expected at least 2 elements in info list, but got {len(info)} elements")
-    
-    export_filename = f"configExport-{identity}-{system_version}-{current_date}-{current_time}.rsc"
-    backup_filename = f"configBackup-{identity}-{system_version}-{current_date}-{current_time}.backup"
-    
-    
-    local_export_file = fr'C:\Users\User\Desktop\{export_filename}'
-    local_backup_file = fr'C:\Users\User\Desktop\{backup_filename}'
+        print(f"Coudn't delete {file_path}")
+        return 0
 
+# tu stant programu
+def main(): 
+    # variables
+    googledrive_folderid = "1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C" 
+    database_file = "network_devices.db"
+    LogFilePath = "NetManagerLog.txt"
+    max_file_count_googledrive = 30  # Maximum number of files in googledrive_folderid
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    current_time = datetime.now().strftime("%H-%M-%S")
 
-    # Run MikroTik script to generate export and backup files
-    run_mikrotik_script(ssh,current_time)
+    logging.basicConfig(filename=LogFilePath, level=logging.INFO, format='%(asctime)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    logging.info("Starting script...")
     
-    # Fetch files from MikroTik router to local PC
-    fetch_files_from_router(ssh, local_export_file, local_backup_file, export_filename, backup_filename)
+    # Accessing database
+    try:
+        conn = sqlite3.connect(database_file)
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM devices')
+        device_info = cur.fetchall()
+        logging.info(f"Accessing {database_file}")
+    except Exception as error:
+        logging.error(error)
 
-    ssh.close()
-    #Uploading to GoogleDrive
-    service = get_drive_service()
-    upload_to_drive(service, local_export_file)
-    upload_to_drive(service, local_backup_file)
+    # Authenticating to GoogleDrive API
+    try:
+        google_drive_service = get_drive_service()
+        logging.info("Succesfully authenticated to GoogleDrive API")
+    except Exception as error:
+        logging.error(f"An error occured while trying to authenticate to GoogleDrive API: {error}")
+
+    for item in device_info:
+        router_ip = f'{item[1]}'
+        router_user = f'{item[2]}'
+        router_password = f'{item[3]}'
+    
+        print(f"--------------\nNow accessing ---> \nSource IP: {router_ip}, Logging in as: {router_user}\n--------------")
+        logging.info(f"Trying to access Router IP: {router_ip} as User: {router_user}")
+        
+        try:
+            # Create SSH client
+            ssh = create_ssh_client(router_ip, router_user, router_password)
+            logging.info(f"Successfully logged in to Router IP: {router_ip} as User: {router_user}")
+        
+        except Exception as error:
+            logging.error(f"An error occured while trying to connect to {router_ip} as {router_user}: {error}")
+
+        try:
+            path = f"{os.getcwd()}\\"
+            
+            info = json.loads(retrieve_about_info(ssh))
+
+            export_filename = f"configExport-{info['identity']}-{info['version']}-{current_date}-{current_time}.rsc"
+            backup_filename = f"configBackup-{info['identity']}-{info['version']}-{current_date}-{current_time}.backup"
+            logging.info(f"Gathered information about {router_ip}: Identity: {info['identity']} System Version: {info['version']}")
+
+            local_export_file = f'{path}\\{export_filename}'
+            local_backup_file = f'{path}\\{backup_filename}'
+
+            commands =[
+                f"/export file={export_filename};",
+                f"/system backup save name={backup_filename};"
+            ]
+            try:
+                for command in commands:
+                    run_mikrotik_command_viaSSH(ssh, command)
+            except Exception as error:
+                logging.error(f"An error occurred while trying to run commands {error}")
+
+            time.sleep(5)
+
+            # downloading the backup/export files from router
+            try:
+                get_file_viaSCP (ssh, export_filename, local_export_file)
+                logging.info(f"Successfully copied {export_filename} to {local_export_file}")
+                get_file_viaSCP (ssh, backup_filename, local_backup_file)
+                logging.info(f"Successfully copied {backup_filename} to {local_backup_file}")
+
+            except Exception as erorr:
+                logging.error(f"An error occured while trying to copy files via SCP: {error}")
+
+            time.sleep(5)
+            
+            try: 
+                upload_to_drive(google_drive_service, local_export_file,googledrive_folderid)
+                upload_to_drive(google_drive_service, local_backup_file,googledrive_folderid)
+            except Exception as error:
+                logging.error(f"An error occured while trying to upload files to GoogleDrive API: {error}")
+            
+            time.sleep(5)
+            
+            # Delete files from MikroTik
+            try:
+                print(f"Deleting {export_filename} in MikroTik...")
+                logging.info(f"Deleting {export_filename} from MikroTik")
+                run_mikrotik_command_viaSSH(ssh,f'file/remove {export_filename}')
+                
+                print(f"Deleting {backup_filename} in MikroTik...")
+                logging.info(f"Deleting {backup_filename} from MikroTik")
+                run_mikrotik_command_viaSSH(ssh,f'file/remove {backup_filename}')
+            except Exception as error:
+                print(f"Error occured: {error}")
+                logging.error(f"Problem occured while trying to delete files from MikroTik: {erorr}")
+
+            # Delete files locally
+            try:
+                delete_files(local_export_file)
+                print(f"{local_export_file} has been deleted")
+                logging.info(f"Deleting {local_export_file} in {path}")
+            except Exception as erorr:
+                logging.error(f"Problem occured while trying to delete {local_export_file} locally: {error}")
+            try:
+                delete_files(local_backup_file)
+                logging.info(f"Deleting {local_backup_file} in {path}")
+            except Exception as error:
+                logging.error(f"Problem occured while trying to delete {local_backup_file} loaclly: {error}")
+
+            try:
+            # Delete X amount of files inside GoogleDrive
+                deleted_files = delete_oldest_files_in_googledrive(google_drive_service, googledrive_folderid, max_file_count_googledrive)
+                for file in deleted_files:
+                    logging.info(f"Deleted file ID: {file['id']}, Name: {file['name']}, Created Time: {file['createdTime']}")
+
+            except Exception as error:  
+                logging.error(f"An error occured whlie trying to delete files from GoogleDrive: {error}")
+        except TimeoutError:
+            print(f"TIMEOUT - Can't reach host {router_ip}")
+        except Exception as error:
+            print(f"--------------!! ERROR !! --------------\nDetails:\n{error}")
+        finally:
+            logging.info("Script Finished, exiting...")
+            ssh.close()
+            conn.close()
+            
+
+    print ("^^^^^^^^^^^^^^\nScript finished.")
 
 
 if __name__ == '__main__':
