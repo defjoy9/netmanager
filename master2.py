@@ -2,10 +2,12 @@ import os
 import sys
 import json
 import time
+import base64
 import sqlite3
 import logging
 import paramiko
 from scp import SCPClient
+from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -13,7 +15,7 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
+SCOPES = ['https://www.googleapis.com/auth/drive.file','https://www.googleapis.com/auth/gmail.send']
 
 def create_ssh_client(server, user, password):
     ssh = paramiko.SSHClient()
@@ -69,19 +71,19 @@ def get_file_viaSCP (ssh, src, dst):
             scp.close()
             return 0,e
 
-def get_drive_service():
+def get_google_service(api_name, api_version, scopes):
     creds = None
     if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        creds = Credentials.from_authorized_user_file('token.json', scopes)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', scopes)
             creds = flow.run_local_server(port=0)
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
-    return build('drive', 'v3', credentials=creds)
+    return build(api_name, api_version, credentials=creds)
 
 def upload_to_drive(service, local_file_path, drive_folder_id):
     file_metadata = {
@@ -138,6 +140,27 @@ def delete_files(file_path):
         print(f"Coudn't delete {file_path}")
         return 0
 
+def create_message(sender, to, subject, message_text):
+    """Create a message for an email."""
+    message = MIMEText(message_text)
+    message['to'] = to
+    message['from'] = sender
+    message['subject'] = subject
+    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    return {'raw': raw_message}
+
+def send_message(service, user_id, message):
+    """Send an email message."""
+    try:
+        message = service.users().messages().send(userId=user_id, body=message).execute()
+        logging.info(f"Message Id: {message['id']}")
+        return message
+    except Exception as error:
+        logging.error(f'An error occurred: {error}')
+        return None
+
+
+
 # tu stant programu
 def main(): 
     print("Starting program...")
@@ -151,6 +174,16 @@ def main():
     current_time = datetime.now().strftime("%H-%M-%S")
     files_to_upload = []
 
+    # mail configuration
+
+    # sender = "***REMOVED***"
+    # to = "***REMOVED***"
+    # subject = "NetManager Script Alert"
+    # message_text = "This is a test email sent from a Python script."
+    #message = create_message(sender, to, subject, message_text)
+    
+
+
     logging.basicConfig(filename=LogFilePath, level=logging.INFO, format='%(asctime)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     logging.info("---------------------------- Starting script ----------------------------")
     
@@ -162,11 +195,13 @@ def main():
         device_info = cur.fetchall()
         logging.info(f"Accessing {database_file}")
 
-        # Authenticating to GoogleDrive API
+        # Authenticating to Google APIs
         try:
-            google_drive_service = get_drive_service()
-            logging.info("Succesfully authenticated to GoogleDrive API")
-
+            drive_service = get_google_service('drive', 'v3', SCOPES)
+            gmail_service = get_google_service('gmail', 'v1', SCOPES)
+            logging.info("Succesfully authenticated to Google API")
+            #send_message(gmail_service, 'me', message)
+            
             # Gathering information about current device
             for item in device_info:
                 router_ip = f'{item[1]}'
@@ -242,13 +277,12 @@ def main():
                 time.sleep(delay_time)
 
                 # Uploading files to GoogleDrive via API
-                # add variables that says x out of x files uploaded successfully??
-                
+                # add variables that says x out of x files uploaded successfully??                
                 files_to_upload = [local_export_file,local_backup_file]
                 gd_api_fail = 0
                 for file in files_to_upload:
                     try:
-                        upload_to_drive(google_drive_service,file,googledrive_folderid)
+                        upload_to_drive(drive_service,file,googledrive_folderid)
                         logging.info(f"Successfully uploaded {file}, to GoogleDrive folderID: {googledrive_folderid}")
                     except Exception as e:
                         logging.error(f"An error occured while trying to upload {local_backup_file} to GoogleDrive API: {e}")
@@ -281,7 +315,6 @@ def main():
                 
                 time.sleep(delay_time)
 
-
                 local_del_fail = 0
                 # Delete files locally
                 logging.info(f"Proceeding with deleting files locally...")
@@ -303,7 +336,7 @@ def main():
                 # Delete X amount of files inside GoogleDrive
                 logging.info(f"Proceeding with deleting files from GoogleDrive")
                 try:
-                    deleted_files = delete_oldest_files_in_googledrive(google_drive_service, googledrive_folderid, max_file_count_googledrive)
+                    deleted_files = delete_oldest_files_in_googledrive(drive_service, googledrive_folderid, max_file_count_googledrive)
                     for file in deleted_files:
                         logging.info(f"Deleted file ID: {file['id']}, Name: {file['name']}, Created Time: {file['createdTime']}")
 
@@ -313,8 +346,8 @@ def main():
                 
                 logging.info(f"Error Summary for {router_ip}: Copying via SCP - {scp_fail}, GoogleDrive upload - {gd_api_fail}, Deleting files from MikroTik - {command_del_fail}, Deleting files locally - {local_del_fail}, Deleting files from GoogleDrive - {gd_del_fail}")
         except Exception as e:
-            logging.error(f"An error occured while trying to authenticate to GoogleDrive API: {e}")
-        
+            logging.error(f"An error occured while trying to authenticate to Google API: {e}")
+    
     except Exception as e:
         logging.error(f"Problem occured while trying to access Database: {e}")
     
