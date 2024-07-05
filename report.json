@@ -1,0 +1,42 @@
+{
+    "devices": [
+        {
+            "name": "192.168.137.182",
+            "actions": {
+                "SSH Connection": {
+                    "status": "failed",
+                    "message": "An error occured while trying to connect to 192.168.137.182 as python: [WinError 10060] Pr\u00f3ba po\u0142\u0105czenia nie powiod\u0142a si\u0119, poniewa\u017c po\u0142\u0105czona strona nie odpowiedzia\u0142a poprawnie po ustalonym okresie czasu lub utworzone po\u0142\u0105czenie nie powiod\u0142o si\u0119, poniewa\u017c po\u0142\u0105czony host nie odpowiedzia\u0142"
+                }
+            }
+        },
+        {
+            "name": "192.168.137.29",
+            "actions": {
+                "SSH Connection": {
+                    "status": "success",
+                    "message": "Successfully logged in to Router IP: 192.168.137.29 as User: python"
+                },
+                "Backup Commands": {
+                    "status": "success",
+                    "message": "Command '/system backup save name=configBackup-test-cyfrowe-7.15-2024-07-05-15-32-19.backup;' has been executed successfully. Output: Configuration backup saved\r\n"
+                },
+                "Copying files via SCP": {
+                    "status": "success",
+                    "message": "Successfully copied configBackup-test-cyfrowe-7.15-2024-07-05-15-32-19.backup to C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-07-05-15-32-19.backup via SCP"
+                },
+                "Uploading files to GoogleDriveAPI": {
+                    "status": "success",
+                    "message": "Successfully uploaded C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-07-05-15-32-19.backup, to GoogleDrive folderID: 1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C"
+                },
+                "Deleting files from MikroTik": {
+                    "status": "success",
+                    "message": "Successfully executed command 'file/remove configBackup-test-cyfrowe-7.15-2024-07-05-15-32-19.backup' Output: "
+                },
+                "Deleting files locally": {
+                    "status": "success",
+                    "message": "Deleting C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-07-05-15-32-19.backup in C:\\Users\\User\***REMOVED***\"
+                }
+            }
+        }
+    ]
+}
