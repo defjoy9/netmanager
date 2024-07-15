@@ -1,3 +1,13 @@
 {
-    "devices": []
+    "devices": [
+        {
+            "name": "192.168.137.182",
+            "actions": {
+                "SSH Connection": {
+                    "status": "failed",
+                    "message": "An error occured while trying to connect to 192.168.137.182 as python: [WinError 10060] Pr\u00f3ba po\u0142\u0105czenia nie powiod\u0142a si\u0119, poniewa\u017c po\u0142\u0105czona strona nie odpowiedzia\u0142a poprawnie po ustalonym okresie czasu lub utworzone po\u0142\u0105czenie nie powiod\u0142o si\u0119, poniewa\u017c po\u0142\u0105czony host nie odpowiedzia\u0142"
+                }
+            }
+        }
+    ]
 }

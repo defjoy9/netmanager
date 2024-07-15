@@ -8,6 +8,10 @@ import logging
 import paramiko
 from scp import SCPClient
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -85,6 +89,7 @@ def get_google_service(api_name, api_version, scopes):
             token.write(creds.to_json())
     return build(api_name, api_version, credentials=creds)
 
+
 def upload_to_drive(service, local_file_path, drive_folder_id):
     file_metadata = {
         'name': os.path.basename(local_file_path),
@@ -141,12 +146,26 @@ def delete_files(file_path):
         print(f"Coudn't delete {file_path}")
         return 0
 
-def create_message(sender, to, subject, message_text):
-    """Create a message for an email."""
-    message = MIMEText(message_text)
+def create_message_with_attachment(sender, to, subject, message_text, file_path):
+    """Create a message for an email with an attachment."""
+    # Create the base message container
+    message = MIMEMultipart()
     message['to'] = to
     message['from'] = sender
     message['subject'] = subject
+
+    # Attach the message text
+    msg = MIMEText(message_text)
+    message.attach(msg)
+
+    # Attach the file
+    with open(file_path, 'rb') as f:
+        mime_base = MIMEBase('application', 'octet-stream')
+        mime_base.set_payload(f.read())
+    encoders.encode_base64(mime_base)
+    mime_base.add_header('Content-Disposition', 'attachment', filename=file_path.split('/')[-1])
+    message.attach(mime_base)
+
     raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
     return {'raw': raw_message}
 
@@ -159,7 +178,6 @@ def send_message(service, user_id, message):
     except Exception as error:
         logging.error(f'An error occurred: {error}')
         return None
-
 
 
 # tu stant programu
@@ -176,16 +194,6 @@ def main():
     files_to_upload = []
     script_report = {"devices": []}
 
-    # mail configuration
-
-    sender = "***REMOVED***"
-    to = "***REMOVED***"
-    subject = "NetManager Script Alert"
-    message_text = "This is a test email sent from a Python script."
-    message = create_message(sender, to, subject, message_text)
-    
-
-
     logging.basicConfig(filename=LogFilePath, level=logging.INFO, format='%(asctime)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     logging.info("---------------------------- Starting script ----------------------------")
     
@@ -199,8 +207,8 @@ def main():
 
         # Authenticating to Google APIs
         try:
-            drive_service = get_google_service('drive', 'v3', "https://www.googleapis.com/auth/drive.file")
             gmail_service = get_google_service('gmail', 'v1', "https://www.googleapis.com/auth/gmail.send")
+            drive_service = get_google_service('drive', 'v3', "https://www.googleapis.com/auth/drive.file")
             logging.info("Succesfully authenticated to Google API")
             
             
@@ -340,7 +348,7 @@ def main():
                 # Uploading files to GoogleDrive via API
                 # add variables that says x out of x files uploaded successfully??           
                 device_report["actions"]["Uploading files to GoogleDriveAPI"] = []
-                files_to_upload = ["local_export_file","local_backup_file"]
+                files_to_upload = [local_export_file,local_backup_file]
                 gd_api_fail = 0
                 for file in files_to_upload:
                     try:
@@ -364,7 +372,7 @@ def main():
 
                 
                 # Delete files from MikroTik
-                # delete commands are variables
+                # delete commands are variables?
                 logging.info(f"Proceeding with deleting files from MikroTik...")
                 command_del_fail = 0
                 output, error_msg = run_mikrotik_command_viaSSH(ssh, f'file/remove {export_filename}')
@@ -499,7 +507,7 @@ def main():
                     })
 
                 script_report["devices"].append(device_report)
-
+                
                 #logging.in{router_ip}: Copying via SCP - {scp_fail}, GoogleDrive upload - {gd_api_fail}, Deleting files from MikroTik - {command_del_fail}, Deleting files locally - {local_del_fail}, Deleting files from GoogleDrive - {gd_del_fail}")
         except Exception as e:
             logging.error(f"An error occured while trying to authenticate to Google API: {e}")
@@ -513,11 +521,25 @@ def main():
     # Write the JSON report to a file
     with open(file_path, "w") as json_file:
         json.dump(script_report, json_file, indent=4)
+
+    # send mail (in progress):
+    try:
+        
+        sender = "***REMOVED***"
+        to = "***REMOVED***"
+        subject = "NetManager Script Alert"
+        message_text = "This is a test email sent from a Python script."
+        attachment_file = os.path.join(os.getcwd(), 'report.json')
+        message = create_message_with_attachment(sender, to, subject, message_text, attachment_file)
+        
+        send_message(gmail_service, 'me', message)
+        logging.info("Successfully sent an email")
+        print("Successfully sent an email")
+    except Exception as e:
+        print("There was an error while trying to send an email")
+        logging.error(f"An error occurred while trying to send an email: {e}")
+
     print ("^^^^^^^^^^^^^^\nScript finished.")
-
-    # send mail:
-    send_message(gmail_service, 'me', message)
-
     logging.info("---------------------------- Finished script ---------------------------")
 
 
