@@ -29,6 +29,10 @@ w petli do wszyskich urzadzniach MT
     (log - exiting)
 
 
+
+podsumowanie skryptu w json i wysłanie email'em.
+    - czy rekordy się nadpisują?
+
 Start
 Loading variables
 1. Trying to connect to a database

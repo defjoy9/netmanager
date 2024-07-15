@@ -1,6 +1,3 @@
-
-
-
 def joy(aaaaaaaaaaaaaaaa):
     try:
         if aaaaaaaaaaaaaaaa > 1:

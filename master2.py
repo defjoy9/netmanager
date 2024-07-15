@@ -15,7 +15,7 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-SCOPES = ['https://www.googleapis.com/auth/drive.file','https://www.googleapis.com/auth/gmail.send']
+#SCOPES = ['https://www.googleapis.com/auth/drive.file','https://www.googleapis.com/auth/gmail.send']
 
 def create_ssh_client(server, user, password):
     ssh = paramiko.SSHClient()
@@ -35,7 +35,7 @@ def retrieve_about_info(ssh):
 
     stdin, stdout, stderr = ssh.exec_command(get_identity)
     identity = stdout.read().decode().strip()
-# Tworzenie pustego słownika z kluczami 'version' i 'identity'
+    # Tworzenie pustego słownika z kluczami 'version' i 'identity'
     result = {
         'version': system_version,
         'identity': identity
@@ -129,6 +129,7 @@ def delete_oldest_files_in_googledrive(service, folder_id, max_file_count=30):
                 logging.error(f"An error occurred while deleting file ID: {file['id']}: {e}")
     if file_count <= max_file_count:
         logging.info(f"Skipping deleting files from GoogleDrive. File Count {file_count} <= Max file count {max_file_count}")
+        return 0
     return deleted_files
 
 def delete_files(file_path):
@@ -177,11 +178,11 @@ def main():
 
     # mail configuration
 
-    # sender = "email"
-    # to = "email2
-    # subject = "NetManager Script Alert"
-    # message_text = "This is a test email sent from a Python script."
-    #message = create_message(sender, to, subject, message_text)
+    sender = "***REMOVED***"
+    to = "***REMOVED***"
+    subject = "NetManager Script Alert"
+    message_text = "This is a test email sent from a Python script."
+    message = create_message(sender, to, subject, message_text)
     
 
 
@@ -198,10 +199,10 @@ def main():
 
         # Authenticating to Google APIs
         try:
-            drive_service = get_google_service('drive', 'v3', SCOPES)
-            gmail_service = get_google_service('gmail', 'v1', SCOPES)
+            drive_service = get_google_service('drive', 'v3', "https://www.googleapis.com/auth/drive.file")
+            gmail_service = get_google_service('gmail', 'v1', "https://www.googleapis.com/auth/gmail.send")
             logging.info("Succesfully authenticated to Google API")
-            #send_message(gmail_service, 'me', message)
+            
             
             # Gathering information about current device
             for item in device_info:
@@ -218,6 +219,7 @@ def main():
                 print(f"--------------\nNow accessing ---> \nSource IP: {router_ip}, Logging in as: {router_user}\n--------------")
                 logging.info(f"Trying to access Router IP: {router_ip} as User: {router_user}")
 
+
                 # Create SSH client for current device
                 try:
                     ssh = create_ssh_client(router_ip, router_user, router_password)
@@ -227,9 +229,8 @@ def main():
                         "status": "success",
                         "message": f"Successfully logged in to Router IP: {router_ip} as User: {router_user}"
                     }
-                
                 except Exception as e:
-                    logging.error(f"An error occured while trying to connect to {router_ip} as {router_user}: {e}")
+                    logging.error(f"An error occured while trying to connect to {router_ip} as {router_user} via SSH: {e}")
                     
                     device_report["actions"]["SSH Connection"] = {
                         "status": "failed",
@@ -237,7 +238,6 @@ def main():
                     }
                     script_report["devices"].append(device_report)
                     continue
-
                 path = f"{os.getcwd()}\\"
                 info = json.loads(retrieve_about_info(ssh))
 
@@ -254,28 +254,30 @@ def main():
                 ]
 
                 command_fail = 0
+                device_report["actions"]["Backup Commands"] = []
+
                 for command in commands:
 
                     output, error_msg = run_mikrotik_command_viaSSH(ssh, command)
                     if error_msg:
                         msg = f"An error occured while trying to execute a command {command} Error message: {error_msg}"
-                        
-                        print(msg)
                         logging.error(msg)
-                        command_fail += 1
                         
-                        device_report["actions"]["Backup Commands"] = {
+                        device_report["actions"]["Backup Commands"].append({
+                        "command": command,
                         "status": "failed",
                         "message": msg
-                    }
+                        })
+                        command_fail += 1
                     else:
                         msg = f"Command '{command}' has been executed successfully. Output: {output}"
                         logging.info(msg)
 
-                        device_report["actions"]["Backup Commands"] = {
-                        "status": "success",
-                        "message": msg
-                    }
+                        device_report["actions"]["Backup Commands"].append({
+                            "command": command,
+                            "status": "success",
+                            "message": msg
+                        })
                 if command_fail > 0:
                     logging.info(f"Skipping script for this device. Error count: {command_fail}")
                     script_report["devices"].append(device_report)
@@ -285,33 +287,37 @@ def main():
 
 
                 # Copying files via SCP    --- loop?
+                device_report["actions"]["Copying files via SCP"] = []
                 scp_fail = 0
                 status, scp_error = get_file_viaSCP (ssh, export_filename, local_export_file)
                 if status == 1:
                     msg = f"Successfully copied {export_filename} to {local_export_file} via SCP"
                     logging.info(msg)
-                    device_report["actions"]["Copying files via SCP"] = {
+                    device_report["actions"]["Copying files via SCP"].append({
+                        "command": f"Copying {export_filename} to {local_export_file} via SCP",
                         "status": "success",
                         "message": msg
-                    }
+                    })
                 else:
                     msg = f"An error occured while trying to copy {export_filename} via SCP: {scp_error}"
                     logging.error(msg)
                     scp_fail +=1
-                    device_report["actions"]["Copying files via SCP"] = {
+                    device_report["actions"]["Copying files via SCP"].append({
+                        "command": f"Copying {export_filename} to {local_export_file} via SCP",
                         "status": "failed",
                         "message": msg
-                    }
+                    })
                 
-                status, scp_error = get_file_viaSCP (ssh, backup_filename, local_backup_file)
+                status, scp_error = get_file_viaSCP(ssh, backup_filename, local_backup_file)
                 
                 if status == 1:
                     msg = f"Successfully copied {backup_filename} to {local_backup_file} via SCP"
                     logging.info(msg)
-                    device_report["actions"]["Copying files via SCP"] = {
+                    device_report["actions"]["Copying files via SCP"].append({
+                        "command": f"Copying {backup_filename} to {local_backup_file} via SCP",
                         "status": "success",
                         "message": msg
-                    }
+                    })
 
 
                 else:
@@ -319,10 +325,11 @@ def main():
                     logging.error(msg)
                     scp_fail +=1
 
-                    device_report["actions"]["Copying files via SCP"] = {
+                    device_report["actions"]["Copying files via SCP"].append({
+                        "command": f"Copying {backup_filename} to {local_backup_file} via SCP",
                         "status": "failed",
                         "message": msg
-                    }
+                    })
                 
                 if scp_fail > 0:
                     logging.info(f"Skipping script for this device. Error count {scp_fail}")
@@ -331,33 +338,37 @@ def main():
                 time.sleep(delay_time)
 
                 # Uploading files to GoogleDrive via API
-                # add variables that says x out of x files uploaded successfully??                
-                files_to_upload = [local_export_file,local_backup_file]
+                # add variables that says x out of x files uploaded successfully??           
+                device_report["actions"]["Uploading files to GoogleDriveAPI"] = []
+                files_to_upload = ["local_export_file","local_backup_file"]
                 gd_api_fail = 0
                 for file in files_to_upload:
                     try:
                         upload_to_drive(drive_service,file,googledrive_folderid)
                         msg = f"Successfully uploaded {file}, to GoogleDrive folderID: {googledrive_folderid}"
                         logging.info(msg)
-                        device_report["actions"]["Uploading files to GoogleDriveAPI"] = {
+                        device_report["actions"]["Uploading files to GoogleDriveAPI"].append({
+                        "command": f"Uploading {file}, to GoogleDrive folderID: {googledrive_folderid}",
                         "status": "success",
                         "message": msg
-                    }
+                    })
                     except Exception as e:
-                        msg = f"An error occured while trying to upload {local_backup_file} to GoogleDrive API: {e}"
+                        msg = f"An error occured while trying to upload {file} to GoogleDrive API: {e}"
                         logging.error(msg)
                         gd_api_fail += 1
-                        device_report["actions"]["Uploading files to GoogleDriveAPI"] = {
+                        device_report["actions"]["Uploading files to GoogleDriveAPI"].append({
+                        "command": f"Uploading {file}, to GoogleDrive folderID: {googledrive_folderid}",
                         "status": "failed",
                         "message": msg
-                    }
-
+                    })
 
                 
                 # Delete files from MikroTik
+                # delete commands are variables
                 logging.info(f"Proceeding with deleting files from MikroTik...")
                 command_del_fail = 0
                 output, error_msg = run_mikrotik_command_viaSSH(ssh, f'file/remove {export_filename}')
+                device_report["actions"]["Deleting files from MikroTik"] = []
 
                 if error_msg:
                     msg = f"An error occured while trying to execute a command: file/remove {export_filename}"
@@ -365,18 +376,20 @@ def main():
                     logging.error(msg)
                     command_del_fail += 1
 
-                    device_report["actions"]["Deleting files from MikroTik"] = {
+                    device_report["actions"]["Deleting files from MikroTik"].append({
+                        "command": f'file/remove {export_filename}',
                         "status": "failed",
                         "message": msg
-                    }
+                    })
 
                 else:
-                    msg = "Successfully executed command 'file/remove {export_filename}' Output: {output}"
+                    msg = f"Successfully executed command 'file/remove {export_filename}' Output: {output}"
                     logging.info(msg)
-                    device_report["actions"]["Deleting files from MikroTik"] = {
+                    device_report["actions"]["Deleting files from MikroTik"].append({
+                        "command": f'file/remove {export_filename}',
                         "status": "success",
                         "message": msg
-                    }
+                    })
 
                 output, error_msg = run_mikrotik_command_viaSSH(ssh,f'file/remove {backup_filename}')
 
@@ -385,17 +398,19 @@ def main():
                     print(msg)
                     logging.error(msg)
                     command_del_fail += 1
-                    device_report["actions"]["Deleting files from MikroTik"] = {
+                    device_report["actions"]["Deleting files from MikroTik"].append({
+                        "command": f'file/remove {backup_filename}',
                         "status": "failed",
                         "message": msg
-                    }
+                    })
                 else:
                     msg = f"Successfully executed command 'file/remove {backup_filename}' Output: {output}"
                     logging.info(msg)
-                    device_report["actions"]["Deleting files from MikroTik"] = {
+                    device_report["actions"]["Deleting files from MikroTik"].append({
+                        "command": f'file/remove {backup_filename}',
                         "status": "success",
                         "message": msg
-                    }
+                    })
 
                 if gd_api_fail > 0:
                     logging.info(f"Terminating script for this device. Count of errors: GoogleDrive API - {gd_api_fail}, Deleting files from Mikrotik - {command_del_fail}")
@@ -404,6 +419,7 @@ def main():
                 
                 time.sleep(delay_time)
 
+                device_report["actions"]["Deleting files locally"] = []
                 local_del_fail = 0
                 # Delete files locally
                 logging.info(f"Proceeding with deleting files locally...")
@@ -412,53 +428,78 @@ def main():
                     print(f"{local_export_file} has been deleted")
                     msg = f"Deleting {local_export_file} in {path}"
                     logging.info(msg)
-                    device_report["actions"]["Deleting files locally"] = {
+                    device_report["actions"]["Deleting files locally"].append({
+                        "command": "",
                         "status": "success",
                         "message": msg
-                    }
+                    })
                 except Exception as e:
                     msg = f"Problem occured while trying to delete {local_export_file} locally: {e}"
                     logging.error(msg)
                     local_del_fail += 1
-                    device_report["actions"]["Deleting files locally"] = {
+                    device_report["actions"]["Deleting files locally"].append({
+                        "comannd": "",
                         "status": "failed",
                         "message": msg
-                    }
+                    })
                 try:
                     delete_files(local_backup_file)
                     msg = f"Deleting {local_backup_file} in {path}"
+                    print(f"{local_export_file} has been deleted")
                     logging.info(msg)
-                    device_report["actions"]["Deleting files locally"] = {
+                    device_report["actions"]["Deleting files locally"].append({
+                        "comannd": "",
                         "status": "success",
                         "message": msg
-                    }
+                    })
                 except Exception as e:
-                    msg = f"Problem occured while trying to delete {local_backup_file} loaclly: {e}"
+                    msg = f"Problem occured while trying to delete {local_backup_file} locally: {e}"
                     logging.error(msg)
                     local_del_fail += 1
-                    device_report["actions"]["Deleting files locally"] = {
+                    device_report["actions"]["Deleting files locally"].append({
+                        "comannd": "",
                         "status": "failed",
                         "message": msg
-                    }
+                    })
                 gd_del_fail = 0
                 # Delete X amount of files inside GoogleDrive
                 logging.info(f"Proceeding with deleting files from GoogleDrive")
+                device_report["actions"]["Deleting files from GoogleDriveAPI"] = []
+
                 try:
+                    # Assuming this function returns a list of deleted files
                     deleted_files = delete_oldest_files_in_googledrive(drive_service, googledrive_folderid, max_file_count_googledrive)
-                    for file in deleted_files:
-                        msg = f"Deleted file ID: {file['id']}, Name: {file['name']}, Created Time: {file['createdTime']}"
-                        logging.info(msg)
-                        
+                    
+                    if deleted_files:  # Check if the list is not empty
+                        for file in deleted_files:
+                            msg = f"Deleted file ID: {file['id']}, Name: {file['name']}, Created Time: {file['createdTime']}"
+                            logging.info(msg)
+
+                            device_report["actions"]["Deleting files from GoogleDriveAPI"].append({
+                                "command": "",
+                                "status": "success",
+                                "message": msg
+                            })
+                    else:
+                        msg = f"Skipping this step. Max file count has not yet been reached. {max_file_count_googledrive}"
+                        device_report["actions"]["Deleting files from GoogleDriveAPI"].append({
+                            "command": "",
+                            "status": "success",
+                            "message": msg
+                        })
 
                 except Exception as e:
-                    msg = f"An error occured whlie trying to delete files from GoogleDrive: {e}"
+                    msg = f"An error occurred while trying to delete files from GoogleDrive: {e}"
                     logging.error(msg)
                     gd_del_fail += 1
-                    device_report["actions"]["Deleting files from GoogleDriveAPI"] = {
+                    device_report["actions"]["Deleting files from GoogleDriveAPI"].append({
+                        "command": "",
                         "status": "failed",
                         "message": msg
-                    }
+                    })
+
                 script_report["devices"].append(device_report)
+
                 #logging.in{router_ip}: Copying via SCP - {scp_fail}, GoogleDrive upload - {gd_api_fail}, Deleting files from MikroTik - {command_del_fail}, Deleting files locally - {local_del_fail}, Deleting files from GoogleDrive - {gd_del_fail}")
         except Exception as e:
             logging.error(f"An error occured while trying to authenticate to Google API: {e}")
@@ -473,6 +514,10 @@ def main():
     with open(file_path, "w") as json_file:
         json.dump(script_report, json_file, indent=4)
     print ("^^^^^^^^^^^^^^\nScript finished.")
+
+    # send mail:
+    send_message(gmail_service, 'me', message)
+
     logging.info("---------------------------- Finished script ---------------------------")
 
 
