@@ -22,11 +22,39 @@ from googleapiclient.http import MediaFileUpload
 #SCOPES = ['https://www.googleapis.com/auth/drive.file','https://www.googleapis.com/auth/gmail.send']
 
 def create_ssh_client(server, user, password):
-    ssh = paramiko.SSHClient()
-    ssh.load_system_host_keys()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(server, username=user, password=password)
-    return ssh
+    try:
+        # Create an SSH client
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        # Set up SSH connection parameters
+        ssh_config = {
+            'hostname': server,
+            'port': 22,
+            'username': user,
+            'password': password,
+            'look_for_keys': False,
+            'allow_agent': False,
+            'disabled_algorithms': {
+                'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']
+            }
+        }
+        
+        # Connect to the host
+        client.connect(**ssh_config)
+        
+        print(f"Connected to {server}")
+        
+        # Return the client object
+        return client
+        
+    except paramiko.AuthenticationException:
+        print(f"Authentication failed for {user}@{server}")
+    except paramiko.SSHException as sshException:
+        print(f"Unable to establish SSH connection: {sshException}")
+    except Exception as e:
+        print(f"Exception in connecting to SSH: {e}")
+        return None
 
 def retrieve_about_info(ssh):
 
@@ -201,7 +229,7 @@ def main():
     try:
         conn = sqlite3.connect(database_file)
         cur = conn.cursor()
-        cur.execute('SELECT * FROM devices')
+        cur.execute('SELECT * FROM devices where enable = 1')
         device_info = cur.fetchall()
         logging.info(f"Accessing {database_file}")
 
