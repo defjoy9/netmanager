@@ -1,12 +1,79 @@
 {
     "devices": [
         {
-            "name": "192.168.137.182",
+            "name": "192.168.137.92",
             "actions": {
                 "SSH Connection": {
-                    "status": "failed",
-                    "message": "An error occured while trying to connect to 192.168.137.182 as python: [WinError 10060] Pr\u00f3ba po\u0142\u0105czenia nie powiod\u0142a si\u0119, poniewa\u017c po\u0142\u0105czona strona nie odpowiedzia\u0142a poprawnie po ustalonym okresie czasu lub utworzone po\u0142\u0105czenie nie powiod\u0142o si\u0119, poniewa\u017c po\u0142\u0105czony host nie odpowiedzia\u0142"
-                }
+                    "status": "success",
+                    "message": "Successfully logged in to Router IP: 192.168.137.92 as User: python"
+                },
+                "Backup Commands": [
+                    {
+                        "command": "/export file=configExport-test-cyfrowe-7.15-2024-08-01-11-16-48.rsc;",
+                        "status": "success",
+                        "message": "Command '/export file=configExport-test-cyfrowe-7.15-2024-08-01-11-16-48.rsc;' has been executed successfully. Output: "
+                    },
+                    {
+                        "command": "/system backup save name=configBackup-test-cyfrowe-7.15-2024-08-01-11-16-48.backup;",
+                        "status": "success",
+                        "message": "Command '/system backup save name=configBackup-test-cyfrowe-7.15-2024-08-01-11-16-48.backup;' has been executed successfully. Output: Configuration backup saved\r\n"
+                    }
+                ],
+                "Copying files via SCP": [
+                    {
+                        "command": "Copying configExport-test-cyfrowe-7.15-2024-08-01-11-16-48.rsc to C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-01-11-16-48.rsc via SCP",
+                        "status": "success",
+                        "message": "Successfully copied configExport-test-cyfrowe-7.15-2024-08-01-11-16-48.rsc to C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-01-11-16-48.rsc via SCP"
+                    },
+                    {
+                        "command": "Copying configBackup-test-cyfrowe-7.15-2024-08-01-11-16-48.backup to C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-01-11-16-48.backup via SCP",
+                        "status": "success",
+                        "message": "Successfully copied configBackup-test-cyfrowe-7.15-2024-08-01-11-16-48.backup to C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-01-11-16-48.backup via SCP"
+                    }
+                ],
+                "Uploading files to GoogleDriveAPI": [
+                    {
+                        "command": "Uploading C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-01-11-16-48.rsc, to GoogleDrive folderID: 1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C",
+                        "status": "success",
+                        "message": "Successfully uploaded C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-01-11-16-48.rsc, to GoogleDrive folderID: 1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C"
+                    },
+                    {
+                        "command": "Uploading C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-01-11-16-48.backup, to GoogleDrive folderID: 1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C",
+                        "status": "success",
+                        "message": "Successfully uploaded C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-01-11-16-48.backup, to GoogleDrive folderID: 1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C"
+                    }
+                ],
+                "Deleting files from MikroTik": [
+                    {
+                        "command": "file/remove configExport-test-cyfrowe-7.15-2024-08-01-11-16-48.rsc",
+                        "status": "success",
+                        "message": "Successfully executed command 'file/remove configExport-test-cyfrowe-7.15-2024-08-01-11-16-48.rsc' Output: "
+                    },
+                    {
+                        "command": "file/remove configBackup-test-cyfrowe-7.15-2024-08-01-11-16-48.backup",
+                        "status": "success",
+                        "message": "Successfully executed command 'file/remove configBackup-test-cyfrowe-7.15-2024-08-01-11-16-48.backup' Output: "
+                    }
+                ],
+                "Deleting files locally": [
+                    {
+                        "command": "",
+                        "status": "success",
+                        "message": "Deleting C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-01-11-16-48.rsc in C:\\Users\\User\***REMOVED***\"
+                    },
+                    {
+                        "comannd": "",
+                        "status": "success",
+                        "message": "Deleting C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-01-11-16-48.backup in C:\\Users\\User\***REMOVED***\"
+                    }
+                ],
+                "Deleting files from GoogleDriveAPI": [
+                    {
+                        "command": "",
+                        "status": "success",
+                        "message": "Skipping this step. Max file count has not yet been reached. 140"
+                    }
+                ]
             }
         }
     ]

@@ -12,14 +12,15 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-from datetime import datetime, timedelta
+import smtplib
+from datetime import datetime
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-#SCOPES = ['https://www.googleapis.com/auth/drive.file','https://www.googleapis.com/auth/gmail.send']
+#SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
 def create_ssh_client(server, user, password):
     try:
@@ -174,39 +175,30 @@ def delete_files(file_path):
         print(f"Coudn't delete {file_path}")
         return 0
 
-def create_message_with_attachment(sender, to, subject, message_text, file_path):
-    """Create a message for an email with an attachment."""
-    # Create the base message container
-    message = MIMEMultipart()
-    message['to'] = to
-    message['from'] = sender
-    message['subject'] = subject
+def email_send(username, password, mail_from, mail_to, mail_subject, mail_body, attach_filename):
+    current_directory = os.getcwd()
+    attach_filepath = os.path.join(current_directory, attach_filename)
 
-    # Attach the message text
-    msg = MIMEText(message_text)
-    message.attach(msg)
+    mimemsg = MIMEMultipart()
+    mimemsg['From']=mail_from
+    mimemsg['To']=mail_to
+    mimemsg['Subject']=mail_subject
+    mimemsg.attach(MIMEText(mail_body, 'plain'))
 
-    # Attach the file
-    with open(file_path, 'rb') as f:
-        mime_base = MIMEBase('application', 'octet-stream')
-        mime_base.set_payload(f.read())
-    encoders.encode_base64(mime_base)
-    mime_base.add_header('Content-Disposition', 'attachment', filename=file_path.split('/')[-1])
-    message.attach(mime_base)
+    # ------- Attachment
+    with open(attach_filepath, "rb") as file:
 
-    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-    return {'raw': raw_message}
+        part1 = MIMEBase('application', 'octet-stream')
+        part1.set_payload(file.read())
+        encoders.encode_base64(part1)
+        part1.add_header('Content-Disposition', f"attachment; filename={attach_filename}")
+        mimemsg.attach(part1)
 
-def send_message(service, user_id, message):
-    """Send an email message."""
-    try:
-        message = service.users().messages().send(userId=user_id, body=message).execute()
-        logging.info(f"Message Id: {message['id']}")
-        return message
-    except Exception as error:
-        logging.error(f'An error occurred: {error}')
-        return None
-
+    connection = smtplib.SMTP(host='smtp.office365.com', port=587)
+    connection.starttls()
+    connection.login(username,password)
+    connection.send_message(mimemsg)
+    connection.quit()
 
 # tu stant programu
 def main(): 
@@ -235,10 +227,8 @@ def main():
 
         # Authenticating to Google APIs
         try:
-            gmail_service = get_google_service('gmail', 'v1', "https://www.googleapis.com/auth/gmail.send")
-            drive_service = get_google_service('drive', 'v3', "https://www.googleapis.com/auth/drive.file")
+            drive_service = get_google_service('drive', 'v3', ["https://www.googleapis.com/auth/drive.file"])
             logging.info("Succesfully authenticated to Google API")
-            
             
             # Gathering information about current device
             for item in device_info:
@@ -550,22 +540,21 @@ def main():
     with open(file_path, "w") as json_file:
         json.dump(script_report, json_file, indent=4)
 
-    # send mail (in progress):
-    try:
-        
-        sender = "***REMOVED***"
-        to = "***REMOVED***"
-        subject = "NetManager Script Alert"
-        message_text = "This is a test email sent from a Python script."
-        attachment_file = os.path.join(os.getcwd(), 'report.json')
-        message = create_message_with_attachment(sender, to, subject, message_text, attachment_file)
-        
-        send_message(gmail_service, 'me', message)
-        logging.info("Successfully sent an email")
-        print("Successfully sent an email")
-    except Exception as e:
-        print("There was an error while trying to send an email")
-        logging.error(f"An error occurred while trying to send an email: {e}")
+    # send mail :
+    send_email = 0
+    if send_email == 1:
+        try:
+            username = "***REMOVED***"
+            password = "***REMOVED***"
+            mail_from = "***REMOVED***"
+            mail_to = "***REMOVED***"
+            mail_subject = "NetManager Script Alert"
+            mail_body = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            attach_filename = 'report.json'
+            email_send(username, password, mail_from, mail_to, mail_subject, mail_body, attach_filename)
+            logging.info("Email sent successfully")
+        except Exception as e:
+            logging.error(f"An error occured while trying to send email: {e}")
 
     print ("^^^^^^^^^^^^^^\nScript finished.")
     logging.info("---------------------------- Finished script ---------------------------")
