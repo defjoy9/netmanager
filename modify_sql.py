@@ -17,8 +17,8 @@ conn = sqlite3.connect('network_devices.db')
 cur = conn.cursor()
 cur.execute('''
     UPDATE devices
-    SET enable = "0"
-    WHERE ip_address = "10.21.1.1"
+    SET enable = "1"
+    WHERE ip_address = "192.168.137.182"
 ''')
 # cur.execute('''
 #     UPDATE devices

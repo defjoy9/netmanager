@@ -50,11 +50,11 @@ def create_ssh_client(server, user, password):
         return client
         
     except paramiko.AuthenticationException:
-        print(f"Authentication failed for {user}@{server}")
+        logging.error(f"Authentication failed for {user}@{server}")
     except paramiko.SSHException as sshException:
-        print(f"Unable to establish SSH connection: {sshException}")
+        logging.error(f"Unable to establish SSH connection: {sshException}")
     except Exception as e:
-        print(f"Exception in connecting to SSH: {e}")
+        logging.error(f"Exception in connecting to SSH: {e}")
         return None
 
 def retrieve_about_info(ssh):
@@ -79,7 +79,7 @@ def retrieve_about_info(ssh):
 def run_mikrotik_command_viaSSH(ssh, command):
 
     stdin, stdout, stderr = ssh.exec_command(command)
-    output = stdout.read().decode('utf-8')
+    output = stdout.read().decode('utf-8').strip()
     
     error_patterns = ["bad command name","expected end of command", "invalid", "failure", "error"]
     error = None
@@ -117,7 +117,6 @@ def get_google_service(api_name, api_version, scopes):
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
     return build(api_name, api_version, credentials=creds)
-
 
 def upload_to_drive(service, local_file_path, drive_folder_id):
     file_metadata = {
@@ -249,6 +248,14 @@ def main():
                 # Create SSH client for current device
                 try:
                     ssh = create_ssh_client(router_ip, router_user, router_password)
+                    
+                    if ssh is None:
+                        device_report["actions"]["SSH Connection"] = {
+                        "status": "failed",
+                        "message": f"An error occured while trying to connect to {router_ip} as {router_user}"
+                        }
+                        script_report["devices"].append(device_report)
+                        continue
                     logging.info(f"Successfully logged in to Router IP: {router_ip} as User: {router_user}")
 
                     device_report["actions"]["SSH Connection"] = {
