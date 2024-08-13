@@ -318,7 +318,6 @@ def main():
                 time.sleep(delay_time)
 
                 # Copying files via SCP    --- loop? -------------------------------------------------------------------------------
-                # technically it doesn't check if file exists... false-positive?
                 device_report["actions"]["Copying files via SCP"] = []
                 scp_fail = 0
                 status, scp_error = get_file_viaSCP (ssh, export_filename, local_export_file)
@@ -396,38 +395,53 @@ def main():
                 # Delete files from MikroTik -------------------------------------------------------------------------------
                 logging.info(f"Proceeding with deleting files from MikroTik...")
                 command_del_fail = 0
-                del_commands =[
-                    f'file/remove {export_filename};',
-                    f'file/remove {backup_filename};'
-                ]
+                output, error_msg = run_mikrotik_command_viaSSH(ssh, f'file/remove {export_filename}')
                 device_report["actions"]["Deleting files from MikroTik"] = []
-                for command_del in del_commands:
-                    output, error_msg = run_mikrotik_command_viaSSH(ssh, command_del)
-                    
-                    if error_msg:
-                        msg = f"An error occured while trying to execute a command: {command_del}"
-                        print(msg)
-                        logging.error(msg)
-                        command_del_fail += 1
-                        device_report["actions"]["Deleting files from MikroTik"].append({
-                            "command": f'file/remove {command_del}',
-                            "status": "failed",
-                            "message": msg
-                        })
-                    else:
-                        msg = f"Successfully executed command '{command_del}' Output: {output}"
-                        logging.info(msg)
-                        device_report["actions"]["Deleting files from MikroTik"].append({
-                            "command": f'{command_del}',
-                            "status": "success",
-                            "message": msg
-                        })
+
+                if error_msg:
+                    msg = f"An error occured while trying to execute a command: file/remove {export_filename}"
+                    print(msg)
+                    logging.error(msg)
+                    command_del_fail += 1
+
+                    device_report["actions"]["Deleting files from MikroTik"].append({
+                        "command": f'file/remove {export_filename}',
+                        "status": "failed",
+                        "message": msg
+                    })
+
+                else:
+                    msg = f"Successfully executed command 'file/remove {export_filename}' Output: {output}"
+                    logging.info(msg)
+                    device_report["actions"]["Deleting files from MikroTik"].append({
+                        "command": f'file/remove {export_filename}',
+                        "status": "success",
+                        "message": msg
+                    })
 
                 output, error_msg = run_mikrotik_command_viaSSH(ssh,f'file/remove {backup_filename}')
 
+                if error_msg:
+                    msg = f"An error occured while trying to execute a command file/remove {backup_filename} Error message: {error_msg}"
+                    print(msg)
+                    logging.error(msg)
+                    command_del_fail += 1
+                    device_report["actions"]["Deleting files from MikroTik"].append({
+                        "command": f'file/remove {backup_filename}',
+                        "status": "failed",
+                        "message": msg
+                    })
+                else:
+                    msg = f"Successfully executed command 'file/remove {backup_filename}' Output: {output}"
+                    logging.info(msg)
+                    device_report["actions"]["Deleting files from MikroTik"].append({
+                        "command": f'file/remove {backup_filename}',
+                        "status": "success",
+                        "message": msg
+                    })
+
                 if gd_api_fail > 0:
                     logging.info(f"Terminating script for this device. Count of errors: GoogleDrive API - {gd_api_fail}, Deleting files from Mikrotik - {command_del_fail}")
-                    script_report["devices"].append(device_report)
                     continue
                 
                 time.sleep(delay_time)
@@ -518,14 +532,14 @@ def main():
         msg = f"Problem occured while trying to access Database: {e}"
         logging.error(msg)
     
-    report_file = "report.json"
+    file_path = "report.json"
 
     # Write the JSON report to a file
-    with open(report_file, "w") as json_file:
+    with open(file_path, "w") as json_file:
         json.dump(script_report, json_file, indent=4)
 
     # send mail :
-    send_email = 1
+    send_email = 0
     if send_email == 1:
         try:
             username = "***REMOVED***"
@@ -533,7 +547,7 @@ def main():
             mail_from = "***REMOVED***"
             mail_to = "***REMOVED***"
             mail_subject = "NetManager Script Alert"
-            mail_body = json.dumps(report_file, indent=4, ensure_ascii=False)
+            mail_body = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
             attach_filename = 'report.json'
             email_send(username, password, mail_from, mail_to, mail_subject, mail_body, attach_filename)
             logging.info("Email sent successfully")

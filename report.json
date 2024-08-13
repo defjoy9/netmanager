@@ -1,79 +1,70 @@
 {
     "devices": [
         {
-            "name": "192.168.137.182",
-            "actions": {
-                "SSH Connection": {
-                    "status": "failed",
-                    "message": "An error occured while trying to connect to 192.168.137.182 as python"
-                }
-            }
-        },
-        {
-            "name": "192.168.137.92",
+            "name": "192.168.137.121",
             "actions": {
                 "SSH Connection": {
                     "status": "success",
-                    "message": "Successfully logged in to Router IP: 192.168.137.92 as User: python"
+                    "message": "Successfully logged in to Router IP: 192.168.137.121 as User: python"
                 },
                 "Backup Commands": [
                     {
-                        "command": "/export file=configExport-test-cyfrowe-7.15-2024-08-01-13-54-15.rsc;",
+                        "command": "/export file=configExport-test-cyfrowe-7.15-2024-08-12-11-03-53.rsc;",
                         "status": "success",
-                        "message": "Command '/export file=configExport-test-cyfrowe-7.15-2024-08-01-13-54-15.rsc;' has been executed successfully. Output: "
+                        "message": "Command '/export file=configExport-test-cyfrowe-7.15-2024-08-12-11-03-53.rsc;' has been executed successfully. Output: "
                     },
                     {
-                        "command": "/system backup save name=configBackup-test-cyfrowe-7.15-2024-08-01-13-54-15.backup;",
+                        "command": "/system backup save name=configBackup-test-cyfrowe-7.15-2024-08-12-11-03-53.backup;",
                         "status": "success",
-                        "message": "Command '/system backup save name=configBackup-test-cyfrowe-7.15-2024-08-01-13-54-15.backup;' has been executed successfully. Output: Configuration backup saved"
+                        "message": "Command '/system backup save name=configBackup-test-cyfrowe-7.15-2024-08-12-11-03-53.backup;' has been executed successfully. Output: Configuration backup saved"
                     }
                 ],
                 "Copying files via SCP": [
                     {
-                        "command": "Copying configExport-test-cyfrowe-7.15-2024-08-01-13-54-15.rsc to C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-01-13-54-15.rsc via SCP",
+                        "command": "Copying configExport-test-cyfrowe-7.15-2024-08-12-11-03-53.rsc to C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-12-11-03-53.rsc via SCP",
                         "status": "success",
-                        "message": "Successfully copied configExport-test-cyfrowe-7.15-2024-08-01-13-54-15.rsc to C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-01-13-54-15.rsc via SCP"
+                        "message": "Successfully copied configExport-test-cyfrowe-7.15-2024-08-12-11-03-53.rsc to C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-12-11-03-53.rsc via SCP"
                     },
                     {
-                        "command": "Copying configBackup-test-cyfrowe-7.15-2024-08-01-13-54-15.backup to C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-01-13-54-15.backup via SCP",
+                        "command": "Copying configBackup-test-cyfrowe-7.15-2024-08-12-11-03-53.backup to C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-12-11-03-53.backup via SCP",
                         "status": "success",
-                        "message": "Successfully copied configBackup-test-cyfrowe-7.15-2024-08-01-13-54-15.backup to C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-01-13-54-15.backup via SCP"
+                        "message": "Successfully copied configBackup-test-cyfrowe-7.15-2024-08-12-11-03-53.backup to C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-12-11-03-53.backup via SCP"
                     }
                 ],
                 "Uploading files to GoogleDriveAPI": [
                     {
-                        "command": "Uploading C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-01-13-54-15.rsc, to GoogleDrive folderID: 1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C",
+                        "command": "Uploading C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-12-11-03-53.rsc, to GoogleDrive folderID: ***REMOVED***",
                         "status": "success",
-                        "message": "Successfully uploaded C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-01-13-54-15.rsc, to GoogleDrive folderID: 1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C"
+                        "message": "Successfully uploaded C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-12-11-03-53.rsc, to GoogleDrive folderID: ***REMOVED***"
                     },
                     {
-                        "command": "Uploading C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-01-13-54-15.backup, to GoogleDrive folderID: 1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C",
+                        "command": "Uploading C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-12-11-03-53.backup, to GoogleDrive folderID: ***REMOVED***",
                         "status": "success",
-                        "message": "Successfully uploaded C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-01-13-54-15.backup, to GoogleDrive folderID: 1jIkJ-v9g3z94cLAGFSkBKSI_zrX-_y7C"
+                        "message": "Successfully uploaded C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-12-11-03-53.backup, to GoogleDrive folderID: ***REMOVED***"
                     }
                 ],
                 "Deleting files from MikroTik": [
                     {
-                        "command": "file/remove configExport-test-cyfrowe-7.15-2024-08-01-13-54-15.rsc",
+                        "command": "file/remove configExport-test-cyfrowe-7.15-2024-08-12-11-03-53.rsc;",
                         "status": "success",
-                        "message": "Successfully executed command 'file/remove configExport-test-cyfrowe-7.15-2024-08-01-13-54-15.rsc' Output: "
+                        "message": "Successfully executed command 'file/remove configExport-test-cyfrowe-7.15-2024-08-12-11-03-53.rsc;' Output: "
                     },
                     {
-                        "command": "file/remove configBackup-test-cyfrowe-7.15-2024-08-01-13-54-15.backup",
+                        "command": "file/remove configBackup-test-cyfrowe-7.15-2024-08-12-11-03-53.backup;",
                         "status": "success",
-                        "message": "Successfully executed command 'file/remove configBackup-test-cyfrowe-7.15-2024-08-01-13-54-15.backup' Output: "
+                        "message": "Successfully executed command 'file/remove configBackup-test-cyfrowe-7.15-2024-08-12-11-03-53.backup;' Output: "
                     }
                 ],
                 "Deleting files locally": [
                     {
                         "command": "",
                         "status": "success",
-                        "message": "Deleting C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-01-13-54-15.rsc in C:\\Users\\User\***REMOVED***\"
+                        "message": "Deleting C:\\Users\\User\***REMOVED***\\\configExport-test-cyfrowe-7.15-2024-08-12-11-03-53.rsc in C:\\Users\\User\***REMOVED***\"
                     },
                     {
                         "comannd": "",
                         "status": "success",
-                        "message": "Deleting C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-01-13-54-15.backup in C:\\Users\\User\***REMOVED***\"
+                        "message": "Deleting C:\\Users\\User\***REMOVED***\\\configBackup-test-cyfrowe-7.15-2024-08-12-11-03-53.backup in C:\\Users\\User\***REMOVED***\"
                     }
                 ],
                 "Deleting files from GoogleDriveAPI": [
@@ -83,6 +74,15 @@
                         "message": "Skipping this step. Max file count has not yet been reached. 140"
                     }
                 ]
+            }
+        },
+        {
+            "name": "192.168.137.144",
+            "actions": {
+                "SSH Connection": {
+                    "status": "failed",
+                    "message": "An error occured while trying to connect to 192.168.137.144 as python"
+                }
             }
         }
     ]
