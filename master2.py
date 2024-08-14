@@ -14,6 +14,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 import smtplib
 from datetime import datetime
+from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -105,17 +106,12 @@ def get_file_viaSCP (ssh, src, dst):
             return 0,e
 
 def get_google_service(api_name, api_version, scopes):
-    creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', scopes)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', scopes)
-            creds = flow.run_local_server(port=0)
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
+    # Load the service account key file
+    SERVICE_ACCOUNT_FILE = 'credentials.json'
+    creds = service_account.Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE, scopes=scopes)
+    
+    # Build the service object
     return build(api_name, api_version, credentials=creds)
 
 def upload_to_drive(service, local_file_path, drive_folder_id):
@@ -206,7 +202,7 @@ def main():
     delay_time = 5 # how many seconds should the program wait for: creating files, uploads etc.
     googledrive_folderid = "***REMOVED***" 
     database_file = "network_devices.db"
-    LogFilePath = "NetManagerLog.log"
+    LogFilePath = "net_manager_log.log"
     max_file_count_googledrive = 140  # Maximum number of files in googledrive_folderid
     current_date = datetime.now().strftime("%Y-%m-%d")
     current_time = datetime.now().strftime("%H-%M-%S")
@@ -281,7 +277,7 @@ def main():
                 local_backup_file = f'{path}\\{backup_filename}'
 
                 commands =[
-                    f"/export file={export_filename};",
+                    f"/export file={export_filename} show-sensitive;",
                     f"/system backup save name={backup_filename};"
                 ]
 
@@ -525,7 +521,7 @@ def main():
         json.dump(script_report, json_file, indent=4)
 
     # send mail :
-    send_email = 1
+    send_email = 0
     if send_email == 1:
         try:
             username = "***REMOVED***"
