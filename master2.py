@@ -266,15 +266,15 @@ def main():
                     }
                     script_report["devices"].append(device_report)
                     continue
-                path = f"{os.getcwd()}\\"
+                path = os.getcwd()
                 info = json.loads(retrieve_about_info(ssh))
 
                 export_filename = f"configExport-{info['identity']}-{info['version']}-{current_date}-{current_time}.rsc"
                 backup_filename = f"configBackup-{info['identity']}-{info['version']}-{current_date}-{current_time}.backup"
                 logging.info(f"Gathered information about {router_ip}: Identity: {info['identity']} System Version: {info['version']}")
 
-                local_export_file = f'{path}\\{export_filename}'
-                local_backup_file = f'{path}\\{backup_filename}'
+                local_export_file = os.path.join(path, export_filename)
+                local_backup_file = os.path.join(path, backup_filename)
 
                 commands =[
                     f"/export file={export_filename} show-sensitive;",
@@ -529,7 +529,7 @@ def main():
             mail_from = "***REMOVED***"
             mail_to = "***REMOVED***"
             mail_subject = "NetManager Script Alert"
-            mail_body = json.dumps(report_file, indent=4, ensure_ascii=False)
+            mail_body = json.dumps(script_report, indent=4, ensure_ascii=False)
             attach_filename = 'report.json'
             email_send(username, password, mail_from, mail_to, mail_subject, mail_body, attach_filename)
             logging.info("Email sent successfully")
