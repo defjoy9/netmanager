@@ -82,7 +82,7 @@ def run_mikrotik_command_viaSSH(ssh, command):
     stdin, stdout, stderr = ssh.exec_command(command)
     output = stdout.read().decode('utf-8').strip()
     
-    error_patterns = ["bad command name","expected end of command", "invalid", "failure", "error"]
+    error_patterns = ["bad command name","expected end of command", "invalid", "failure", "error", "invalid input", "syntax error", "action failed"]
     error = None
     for pattern in error_patterns:
         if pattern in output.lower():
@@ -276,15 +276,23 @@ def main():
                 local_export_file = os.path.join(path, export_filename)
                 local_backup_file = os.path.join(path, backup_filename)
 
-                commands =[
-                    f"/export file={export_filename} show-sensitive;",
-                    f"/system backup save name={backup_filename};"
-                ]
-
+                commands_main_map = {
+                        '6': [
+                            f"/export file={export_filename};",
+                            f"/system backup save name={backup_filename};"
+                        ],
+                        '7': [
+                            f"/export file={export_filename} show-sensitive;",
+                            f"/system backup save name={backup_filename};"
+                            ]
+                }
                 command_fail = 0
                 device_report["actions"]["Backup Commands"] = []
+                
+                version_key = '7' if info['version'].startswith('7') else '6'
+                commands_main = commands_main_map[version_key]
 
-                for command in commands:
+                for command in commands_main:
 
                     output, error_msg = run_mikrotik_command_viaSSH(ssh, command)
                     if error_msg:
@@ -392,10 +400,19 @@ def main():
                 # Delete files from MikroTik -------------------------------------------------------------------------------
                 logging.info(f"Proceeding with deleting files from MikroTik...")
                 command_del_fail = 0
-                del_commands =[
-                    f'file/remove {export_filename};',
-                    f'file/remove {backup_filename};'
-                ]
+                
+                del_commands_map = {
+                    '6': [
+                        f'file remove {export_filename};',
+                        f'file remove {backup_filename};'
+                    ],
+                    '7': [
+                        f'file/remove {export_filename};',
+                        f'file/remove {backup_filename};'
+                    ]
+                }
+                del_commands = del_commands_map[version_key]
+
                 device_report["actions"]["Deleting files from MikroTik"] = []
                 for command_del in del_commands:
                     output, error_msg = run_mikrotik_command_viaSSH(ssh, command_del)
@@ -406,7 +423,7 @@ def main():
                         logging.error(msg)
                         command_del_fail += 1
                         device_report["actions"]["Deleting files from MikroTik"].append({
-                            "command": f'file/remove {command_del}',
+                            "command": command_del,
                             "status": "failed",
                             "message": msg
                         })
