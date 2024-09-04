@@ -15,11 +15,9 @@ from email import encoders
 import smtplib
 from datetime import datetime
 from google.oauth2 import service_account
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from Crypto.Cipher import AES
 
 #SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
@@ -58,10 +56,14 @@ def create_ssh_client(server, user, password):
         logging.error(f"Exception in connecting to SSH: {e}")
         return None
 
-def retrieve_about_info(ssh):
+def retrieve_about_info(ssh,version):
 
-    get_system_version = ':put [system/package/update/get installed-version];'
-    get_identity = ':put [system/identity/get name]'
+    if version == '6':
+        get_system_version = ':put [system package update get installed-version];'
+        get_identity = ':put [system identity get name]'
+    if version == '7':
+        get_system_version = ':put [system/package/update/get installed-version];'
+        get_identity = ':put [system/identity/get name]'
 
     # Execute the commands
     stdin, stdout, stderr = ssh.exec_command(get_system_version)
@@ -170,17 +172,17 @@ def delete_files(file_path):
         print(f"Coudn't delete {file_path}")
         return 0
 
-def email_send(username, password, mail_from, mail_to, mail_subject, mail_body, attach_filename):
+def email_send(mail_body, attach_filename):
     current_directory = os.getcwd()
     attach_filepath = os.path.join(current_directory, attach_filename)
+    # ------- Attachment
 
     mimemsg = MIMEMultipart()
-    mimemsg['From']=mail_from
-    mimemsg['To']=mail_to
-    mimemsg['Subject']=mail_subject
+    mimemsg['From']= "***REMOVED***"
+    mimemsg['To']= "***REMOVED***"
+    mimemsg['Subject']="NetManager Script Alert"
     mimemsg.attach(MIMEText(mail_body, 'plain'))
 
-    # ------- Attachment
     with open(attach_filepath, "rb") as file:
 
         part1 = MIMEBase('application', 'octet-stream')
@@ -191,7 +193,7 @@ def email_send(username, password, mail_from, mail_to, mail_subject, mail_body, 
 
     connection = smtplib.SMTP(host='smtp.office365.com', port=587)
     connection.starttls()
-    connection.login(username,password)
+    connection.login("***REMOVED***","***REMOVED***")
     connection.send_message(mimemsg)
     connection.quit()
 
@@ -201,8 +203,8 @@ def main():
     # variables
     delay_time = 5 # how many seconds should the program wait for: creating files, uploads etc.
     googledrive_folderid = "***REMOVED***" 
-    database_file = "network_devices.db"
-    LogFilePath = "net_manager_log.log"
+    database_file = "network_devices1.2.db"
+    LogFilePath = "netmanagerlog.log"
     max_file_count_googledrive = 140  # Maximum number of files in googledrive_folderid
     current_date = datetime.now().strftime("%Y-%m-%d")
     current_time = datetime.now().strftime("%H-%M-%S")
@@ -227,9 +229,6 @@ def main():
             
             # Gathering information about current device -------------------------------------------------------------------------------
             for item in device_info:
-                router_ip = f'{item[1]}'
-                router_user = f'{item[2]}'
-                router_password = f'{item[3]}'
                 
                 #json raport
                 device_report = {
@@ -237,8 +236,36 @@ def main():
                     "actions": {}
                 }
 
+                router_ip = f'{item[2]}'
+                router_user = f'{item[3]}'
+                router_version = f'{item[5]}'
+                
+                try:
+                    cur.execute("SELECT password, nonce, tag FROM devices WHERE ip_address=?", (router_ip,))
+                    row = cur.fetchone()
+                    ciphertext, nonce, tag = row
+                
+                    with open("key.txt", "rb") as f:
+                        key = f.read()
+                
+                    cipher = AES.new(key, AES.MODE_EAX, nonce=nonce)
+                    data = cipher.decrypt_and_verify(ciphertext, tag)
+                    router_password = data.decode()
+                    device_report['actions']['Decrypthing password'] = {
+                        'status': 'success',
+                        'message': '' 
+                    }
+                    script_report['devices'].append(device_report)
+                except Exception as e:
+                    logging.error(f"An erorr occured while trying to decrypt password: {e}")
+                    device_report['actions']['Decrypthing password'] = {
+                        'status': 'failed',
+                        'message': f'{e}' 
+                    }
+                    script_report['devices'].append(device_report)
+                
                 print(f"--------------\nNow accessing ---> \nSource IP: {router_ip}, Logging in as: {router_user}\n--------------")
-                logging.info(f"Trying to access Router IP: {router_ip} as User: {router_user}")
+                logging.info(f"Trying to access Router IP: {router_ip} as User: {router_user} ----------------------------")
 
                 # Create SSH client for current device -------------------------------------------------------------------------------
                 try:
@@ -267,7 +294,7 @@ def main():
                     script_report["devices"].append(device_report)
                     continue
                 path = os.getcwd()
-                info = json.loads(retrieve_about_info(ssh))
+                info = json.loads(retrieve_about_info(ssh,router_version))
 
                 export_filename = f"configExport-{info['identity']}-{info['version']}-{current_date}-{current_time}.rsc"
                 backup_filename = f"configBackup-{info['identity']}-{info['version']}-{current_date}-{current_time}.backup"
@@ -289,7 +316,7 @@ def main():
                 command_fail = 0
                 device_report["actions"]["Backup Commands"] = []
                 
-                version_key = '7' if info['version'].startswith('7') else '6'
+                version_key = '7' if router_version.startswith('7') else '6,'
                 commands_main = commands_main_map[version_key]
 
                 for command in commands_main:
@@ -523,7 +550,6 @@ def main():
 
                 script_report["devices"].append(device_report)
                 
-                #logging.in{router_ip}: Copying via SCP - {scp_fail}, GoogleDrive upload - {gd_api_fail}, Deleting files from MikroTik - {command_del_fail}, Deleting files locally - {local_del_fail}, Deleting files from GoogleDrive - {gd_del_fail}")
         except Exception as e:
             logging.error(f"An error occured while trying to authenticate to Google API: {e}")
     
@@ -541,14 +567,9 @@ def main():
     send_email = 0
     if send_email == 1:
         try:
-            username = "***REMOVED***"
-            password = "***REMOVED***"
-            mail_from = "***REMOVED***"
-            mail_to = "***REMOVED***"
-            mail_subject = "NetManager Script Alert"
             mail_body = json.dumps(script_report, indent=4, ensure_ascii=False)
             attach_filename = 'report.json'
-            email_send(username, password, mail_from, mail_to, mail_subject, mail_body, attach_filename)
+            email_send(mail_body, attach_filename)
             logging.info("Email sent successfully")
         except Exception as e:
             logging.error(f"An error occured while trying to send email: {e}")

@@ -11,7 +11,7 @@
 
 import sqlite3
 
-conn = sqlite3.connect('network_devices.db')
+conn = sqlite3.connect('network_devices1.2.db')
 
 
 cur = conn.cursor()
@@ -22,8 +22,8 @@ cur = conn.cursor()
 # ''')
 cur.execute('''
     UPDATE devices
-    SET ip_address="192.168.137.134"
-    WHERE ip_address="192.168.137.49"
+    SET ip_address="192.168.137.122"
+    WHERE ip_address="192.168.137.76"
 ''')
 # cur.execute('''
 #     UPDATE devices
