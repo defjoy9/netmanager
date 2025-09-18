@@ -6,6 +6,7 @@ import base64
 import sqlite3
 import logging
 import paramiko
+from dotenv import load_dotenv
 from scp import SCPClient
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -19,7 +20,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from Crypto.Cipher import AES
 
-#SCOPES = ['https://www.googleapis.com/auth/drive.file']
+load_dotenv()
 
 def create_ssh_client(server, user, password):
     try:
@@ -30,7 +31,7 @@ def create_ssh_client(server, user, password):
         # Set up SSH connection parameters
         ssh_config = {
             'hostname': server,
-            'port': 22,
+            'port': os.getenv(SSHPORT),
             'username': user,
             'password': password,
             'look_for_keys': False,
@@ -109,7 +110,7 @@ def get_file_viaSCP (ssh, src, dst):
 
 def get_google_service(api_name, api_version, scopes):
     # Load the service account key file
-    SERVICE_ACCOUNT_FILE = 'credentials.json'
+    SERVICE_ACCOUNT_FILE = os.getenv(SERVICE_ACCOUNT_FILE)
     creds = service_account.Credentials.from_service_account_file(
         SERVICE_ACCOUNT_FILE, scopes=scopes)
     
@@ -178,8 +179,8 @@ def email_send(mail_body, attach_filename):
     # ------- Attachment
 
     mimemsg = MIMEMultipart()
-    mimemsg['From']= "***REMOVED***"
-    mimemsg['To']= "***REMOVED***"
+    mimemsg['From']= os.getnev(MAIL_FROM)
+    mimemsg['To']= os.getenv(MAIL_TO)
     mimemsg['Subject']="NetManager Script Alert"
     mimemsg.attach(MIMEText(mail_body, 'plain'))
 
@@ -191,9 +192,9 @@ def email_send(mail_body, attach_filename):
         part1.add_header('Content-Disposition', f"attachment; filename={attach_filename}")
         mimemsg.attach(part1)
 
-    connection = smtplib.SMTP(host='smtp.office365.com', port=587)
+    connection = smtplib.SMTP(host=os.getenv(HOST_SMTP), port=587)
     connection.starttls()
-    connection.login("***REMOVED***","***REMOVED***")
+    connection.login(os.getenv(MAIL_FROM), os.getenv(MAIL_FROM_PASSWORD))
     connection.send_message(mimemsg)
     connection.quit()
 
@@ -202,9 +203,9 @@ def main():
     print("Starting program...")
     # variables
     delay_time = 5 # how many seconds should the program wait for: creating files, uploads etc.
-    googledrive_folderid = "***REMOVED***" 
-    database_file = "network_devices1.2.db"
-    LogFilePath = "netmanagerlog.log"
+    googledrive_folderid = os.getenv(GOOGLEDRIVE_FOLDERID)
+    database_file = os.getenv(DATABASE_FILE)
+    LogFilePath = os.getenv(LOG_FILEPATH)
     max_file_count_googledrive = 140  # Maximum number of files in googledrive_folderid
     current_date = datetime.now().strftime("%Y-%m-%d")
     current_time = datetime.now().strftime("%H-%M-%S")
@@ -228,23 +229,40 @@ def main():
             logging.info("Succesfully authenticated to Google API")
             
             # Gathering information about current device -------------------------------------------------------------------------------
-            for item in device_info:
+            for device in device_info:
+                try:
+                    device_id = device[0]
+                    router_ip = device[1]
+                    router_version = device[3]
+
+                    # Accessing related login_info records for the current device
+                    cur.execute('SELECT user_login, password, nonce, tag FROM login_info WHERE device_id = ?', (device_id,))
+                    login_info = cur.fetchone()
+                    if login_info:
+                        router_user, ciphertext, nonce, tag = login_info
+                    else:
+                        logging.warning(f"No login info found for device ID {device_id}")
+
+                    # Accessing related backup_info records for the current device
+                    cur.execute('SELECT backup_frequency, backup_timestamp, last_backup_status FROM backup_info WHERE device_id = ?', (device_id,))
+                    backup_info = cur.fetchone()
+                    if backup_info:
+                        backup_frequency, backup_timestamp, last_backup_status = backup_info
+                    else:
+                        logging.warning(f"No backup info found for device ID {device_id}")
+
+                except Exception as e:
+                    logging.error(f"Problem occurred while trying to gather information for device ID {device_id}: {e}")
                 
+                # Check backup_frequency eligity?
+
+
                 #json raport
                 device_report = {
-                    "name": item[1],
+                    "name": device[1],
                     "actions": {}
                 }
-
-                router_ip = f'{item[2]}'
-                router_user = f'{item[3]}'
-                router_version = f'{item[5]}'
-                
                 try:
-                    cur.execute("SELECT password, nonce, tag FROM devices WHERE ip_address=?", (router_ip,))
-                    row = cur.fetchone()
-                    ciphertext, nonce, tag = row
-                
                     with open("key.txt", "rb") as f:
                         key = f.read()
                 
@@ -552,10 +570,12 @@ def main():
                 
         except Exception as e:
             logging.error(f"An error occured while trying to authenticate to Google API: {e}")
-    
-    except Exception as e:
+    except sqlite3.Error as e:
         msg = f"Problem occured while trying to access Database: {e}"
         logging.error(msg)
+    finally:
+        if conn:
+            conn.close()
     
     report_file = "report.json"
 
