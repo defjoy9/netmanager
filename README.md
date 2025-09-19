@@ -1,5 +1,7 @@
 # NetManager Script
 
+Note: This script was created for the company i worked for at the time, this project does it's job but does need improvments
+
 ## Overview
 **NetManager** is a Python-based automation suite designed to manage MikroTik network devices efficiently. This suite allows users to:
 
